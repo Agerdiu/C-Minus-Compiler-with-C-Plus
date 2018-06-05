@@ -17,4 +17,5 @@ void SplitString(const string& s, vector<string>& v, const string& c);
 void ShowVars();
 string RAlloc(string var);
 void SetRflag(string RegName, bool value);
+void ShowRegsSituations();
 bool GetRflag(string RegName);
