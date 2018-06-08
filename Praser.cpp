@@ -1,10 +1,10 @@
 #include"Praser.h"
-#include"block.h"
+#include"record.h"
 #include "tools.h"
 #include<map>
 using namespace std;
 
-Praser::Praser(gramTree* root) {
+Praser::Praser(Tree* root) {
 	this->root = root;
 	praserInit();
 }
@@ -15,8 +15,8 @@ Praser::~Praser() {
 }
 
 void Praser::praserInit() {
-	Block wholeBlock;
-	blockStack.push_back(wholeBlock);
+	Record wholeRecord;
+	recordStack.push_back(wholeRecord);
 
 	//事先内置函数print和read
 	funcNode writeNode;
@@ -33,10 +33,10 @@ void Praser::praserInit() {
 	readNode.rtype = "int";
 	funcPool.insert({"read",readNode});
 
-	praserGramTree(root);		//开始分析语法树
+	praserTree(root);		//开始分析语法树
 }
 
-void Praser::praserGramTree(struct gramTree* node) {
+void Praser::praserTree(struct Tree* node) {
 	//cout << "at " << node->name << endl;
 	if (node == NULL || node->line == -1)
 		return;
@@ -53,13 +53,13 @@ void Praser::praserGramTree(struct gramTree* node) {
 
 	//继续向下分析
 	if (node != NULL) {
-		praserGramTree(node->left);
-		praserGramTree(node->right);
+		praserTree(node->left);
+		praserTree(node->right);
 	}
 }
 
-struct gramTree* Praser::praser_statement(struct gramTree* node) {
-	struct gramTree* next = node->left;
+struct Tree* Praser::praser_statement(struct Tree* node) {
+	struct Tree* next = node->left;
 	if (node->left->name == "labeled_statement") {
 
 	}
@@ -82,7 +82,7 @@ struct gramTree* Praser::praser_statement(struct gramTree* node) {
 	return node->right;
 }
 
-void Praser::praser_jump_statement(struct gramTree* node) {
+void Praser::praser_jump_statement(struct Tree* node) {
 	if (node->left->name == "GOTO") {
 
 	}
@@ -90,12 +90,12 @@ void Praser::praser_jump_statement(struct gramTree* node) {
 
 	}
 	else if (node->left->name == "BREAK") {
-		int num = getBreakBlockNumber();
+		int num = getBreakRecordNumber();
 		if (num < 0) {
 			error(node->left->line, "This scope doesn't support break.");
 		}
 	
-		innerCode.addCode("GOTO " + blockStack[num].breakLabelname);
+		innerCode.addCode("GOTO " + recordStack[num].breakLabelname);
 	}
 	else if (node->left->name == "RETURN") {
 		string funcType = getFuncRType();
@@ -109,19 +109,19 @@ void Praser::praser_jump_statement(struct gramTree* node) {
 		else if (node->left->right->name == ";"){//return ;
 			innerCode.addCode("RETURN");
 			if (funcType != "void") {
-				error(node->left->right->line, "You should return " + blockStack.back().func.rtype);
+				error(node->left->right->line, "You should return " + recordStack.back().func.rtype);
 			}
 		}
 	}
 }
 
-void Praser::praser_expression_statement(struct gramTree *node) {
+void Praser::praser_expression_statement(struct Tree *node) {
 	if (node->left->name == "expression") {
 		praser_expression(node->left);
 	}
 }
 
-varNode Praser::praser_expression(struct gramTree* node) {
+varNode Praser::praser_expression(struct Tree* node) {
 	if (node->left->name == "expression") {
 		return praser_expression(node->left);
 	}
@@ -133,24 +133,24 @@ varNode Praser::praser_expression(struct gramTree* node) {
 	}
 }
 
-void Praser::praser_compound_statement(struct gramTree* node) {
+void Praser::praser_compound_statement(struct Tree* node) {
 	//继续分析处理compound_statement
-	praserGramTree(node);
+	praserTree(node);
 }
 
 //if else
-void Praser::praser_selection_statement(struct gramTree* node) {
+void Praser::praser_selection_statement(struct Tree* node) {
 
 
 	if (node->left->name == "IF") {
 		if (node->left->right->right->right->right->right == NULL) {
 			//添加一个新的block
-			Block newblock;
-			blockStack.push_back(newblock);
+			Record newrecord;
+			recordStack.push_back(newrecord);
 
-			gramTree* expression = node->left->right->right;
+			Tree* expression = node->left->right->right;
 			varNode exp_rnode = praser_expression(expression);
-			gramTree* statement = node->left->right->right->right->right;
+			Tree* statement = node->left->right->right->right->right;
 
 			string label1 = innerCode.getLabelName();
 			string label2 = innerCode.getLabelName();
@@ -176,18 +176,18 @@ void Praser::praser_selection_statement(struct gramTree* node) {
 			innerCode.addCode("LABEL " + label2 + " :");
 
 			//弹出添加的block
-			blockStack.pop_back();
+			recordStack.pop_back();
 
 		}
 		else if (node->left->right->right->right->right->right->name == "ELSE") {
 			//添加一个新的block
-			Block newblock1;
-			blockStack.push_back(newblock1);
+			Record newrecord1;
+			recordStack.push_back(newrecord1);
 
-			gramTree* expression = node->left->right->right;
+			Tree* expression = node->left->right->right;
 			varNode exp_rnode = praser_expression(expression);
-			gramTree* statement1 = node->left->right->right->right->right;
-			gramTree* statement2 = node->left->right->right->right->right->right->right;
+			Tree* statement1 = node->left->right->right->right->right;
+			Tree* statement2 = node->left->right->right->right->right->right->right;
 
 			string label1 = innerCode.getLabelName();
 			string label2 = innerCode.getLabelName();
@@ -212,20 +212,20 @@ void Praser::praser_selection_statement(struct gramTree* node) {
 			
 			innerCode.addCode("GOTO " + label3);
 			//弹出添加的block
-			blockStack.pop_back();
+			recordStack.pop_back();
 
 			//else
 			innerCode.addCode("LABEL " + label2 + " :");
 
-			Block newblock2;
-			blockStack.push_back(newblock2);
+			Record newrecord2;
+			recordStack.push_back(newrecord2);
 
 			praser_statement(statement2);
 
 			innerCode.addCode("LABEL " + label3 + " :");
 
 			//弹出添加的block
-			blockStack.pop_back();
+			recordStack.pop_back();
 
 		}
 	}
@@ -236,22 +236,22 @@ void Praser::praser_selection_statement(struct gramTree* node) {
 }
 
 //循环 while for do while
-void Praser::praser_iteration_statement(struct gramTree* node) {
+void Praser::praser_iteration_statement(struct Tree* node) {
 	if (node->left->name == "WHILE") {
 
 		//添加一个新的block
-		Block newblock;
-		newblock.canBreak = true;
-		blockStack.push_back(newblock);
+		Record newrecord;
+		newrecord.canBreak = true;
+		recordStack.push_back(newrecord);
 
-		struct gramTree* expression = node->left->right->right;
-		struct gramTree* statement = node->left->right->right->right->right;
+		struct Tree* expression = node->left->right->right;
+		struct Tree* statement = node->left->right->right->right->right;
 
 		string label1 = innerCode.getLabelName();
 		string label2 = innerCode.getLabelName();
 		string label3 = innerCode.getLabelName();
 
-		blockStack.back().breakLabelname = label3;
+		recordStack.back().breakLabelname = label3;
 
 		innerCode.addCode("LABEL " + label1 + " :");
 
@@ -278,21 +278,21 @@ void Praser::praser_iteration_statement(struct gramTree* node) {
 		
 
 		//弹出添加的block
-		blockStack.pop_back();
+		recordStack.pop_back();
 	}
 	else if (node->left->name == "DO") {
 		//添加一个新的block
-		Block newblock;
-		newblock.canBreak = true;
-		blockStack.push_back(newblock);
+		Record newrecord;
+		newrecord.canBreak = true;
+		recordStack.push_back(newrecord);
 
-		struct gramTree* statement = node->left->right;
-		struct gramTree* expression = node->left->right->right->right->right;
+		struct Tree* statement = node->left->right;
+		struct Tree* expression = node->left->right->right->right->right;
 
 		string label1 = innerCode.getLabelName();
 		string label2 = innerCode.getLabelName();
 
-		blockStack.back().breakLabelname = label2;
+		recordStack.back().breakLabelname = label2;
 
 		innerCode.addCode("LABEL " + label1 + " :");
 
@@ -316,7 +316,7 @@ void Praser::praser_iteration_statement(struct gramTree* node) {
 		innerCode.addCode("LABEL " + label2 + " :");
 
 		//弹出添加的block
-		blockStack.pop_back();
+		recordStack.pop_back();
 
 	}
 	else if (node->left->name == "FOR") {
@@ -324,19 +324,19 @@ void Praser::praser_iteration_statement(struct gramTree* node) {
 			//FOR '(' expression_statement expression_statement ')'statement
 			if (node->left->right->right->right->right->name == ")") {
 				//添加一个新的block
-				Block newblock;
+				Record newblock;
 				newblock.canBreak = true;
-				blockStack.push_back(newblock);
+				recordStack.push_back(newblock);
 
-				gramTree* exp_state1 = node->left->right->right;
-				gramTree* exp_state2 = exp_state1->right;
-				gramTree* statement = exp_state2->right->right;
+				Tree* exp_state1 = node->left->right->right;
+				Tree* exp_state2 = exp_state1->right;
+				Tree* statement = exp_state2->right->right;
 
 				string label1 = innerCode.getLabelName();
 				string label2 = innerCode.getLabelName();
 				string label3 = innerCode.getLabelName();
 
-				blockStack.back().breakLabelname = label3;
+				recordStack.back().breakLabelname = label3;
 
 				if (exp_state1->left->name == "expression") {
 					praser_expression(exp_state1->left);
@@ -376,25 +376,25 @@ void Praser::praser_iteration_statement(struct gramTree* node) {
 				//}
 
 				//弹出添加的block
-				blockStack.pop_back();
+				recordStack.pop_back();
 			}
 			//FOR ( expression_statement expression_statement expression ) statement
 			else if (node->left->right->right->right->right->name == "expression") {
 				//添加一个新的block
-				Block newblock;
+				Record newblock;
 				newblock.canBreak = true;
-				blockStack.push_back(newblock);
+				recordStack.push_back(newblock);
 
-				gramTree* exp_state1 = node->left->right->right;
-				gramTree* exp_state2 = exp_state1->right;
-				gramTree* exp = exp_state2->right;
-				gramTree* statement = exp->right->right;
+				Tree* exp_state1 = node->left->right->right;
+				Tree* exp_state2 = exp_state1->right;
+				Tree* exp = exp_state2->right;
+				Tree* statement = exp->right->right;
 
 				string label1 = innerCode.getLabelName();
 				string label2 = innerCode.getLabelName();
 				string label3 = innerCode.getLabelName();
 
-				blockStack.back().breakLabelname = label3;
+				recordStack.back().breakLabelname = label3;
 
 				if (exp_state1->left->name == "expression") {
 					praser_expression(exp_state1->left);
@@ -437,26 +437,26 @@ void Praser::praser_iteration_statement(struct gramTree* node) {
 				//}
 
 				//弹出添加的block
-				blockStack.pop_back();
+				recordStack.pop_back();
 			}
 		}
 		if (node->left->right->right->name == "declaration") {
 			//FOR '(' declaration expression_statement ')' statement
 			if (node->left->right->right->right->right->name == ")") {
 				//添加一个新的block
-				Block newblock;
+				Record newblock;
 				newblock.canBreak = true;
-				blockStack.push_back(newblock);
+				recordStack.push_back(newblock);
 
-				gramTree *declaration = node->left->right->right;
-				gramTree *expression_statement = declaration->right;
-				gramTree *statement = expression_statement->right->right;
+				Tree *declaration = node->left->right->right;
+				Tree *expression_statement = declaration->right;
+				Tree *statement = expression_statement->right->right;
 
 				string label1 = innerCode.getLabelName();
 				string label2 = innerCode.getLabelName();
 				string label3 = innerCode.getLabelName();
 
-				blockStack.back().breakLabelname = label3;
+				recordStack.back().breakLabelname = label3;
 
 				praser_declaration(declaration);
 				innerCode.addCode("LABEL " + label1 + " :");
@@ -496,26 +496,26 @@ void Praser::praser_iteration_statement(struct gramTree* node) {
 				//}
 
 				//弹出添加的block
-				blockStack.pop_back();
+				recordStack.pop_back();
 
 			}
 			//FOR ( declaration expression_statement expression ) statement
 			else if (node->left->right->right->right->right->name == "expression") {
 				//添加一个新的block
-				Block newblock;
+				Record newblock;
 				newblock.canBreak = true;
-				blockStack.push_back(newblock);
+				recordStack.push_back(newblock);
 
-				gramTree *declaration = node->left->right->right;
-				gramTree *expression_statement = declaration->right;
-				gramTree *expression = expression_statement->right;
-				gramTree *statement = expression->right->right;
+				Tree *declaration = node->left->right->right;
+				Tree *expression_statement = declaration->right;
+				Tree *expression = expression_statement->right;
+				Tree *statement = expression->right->right;
 
 				string label1 = innerCode.getLabelName();
 				string label2 = innerCode.getLabelName();
 				string label3 = innerCode.getLabelName();
 
-				blockStack.back().breakLabelname = label3;
+				recordStack.back().breakLabelname = label3;
 
 				praser_declaration(declaration);
 				innerCode.addCode("LABEL " + label1 + " :");
@@ -555,17 +555,17 @@ void Praser::praser_iteration_statement(struct gramTree* node) {
 				//}
 
 				//弹出添加的block
-				blockStack.pop_back();
+				recordStack.pop_back();
 			}
 		}
 	}
 }
 
 //函数定义
-struct gramTree* Praser::praser_function_definition(struct gramTree* node) {
-	gramTree* type_specifier = node->left;
-	gramTree* declarator = node->left->right;
-	gramTree* compound_statement = declarator->right;
+struct Tree* Praser::praser_function_definition(struct Tree* node) {
+	Tree* type_specifier = node->left;
+	Tree* declarator = node->left->right;
+	Tree* compound_statement = declarator->right;
 	
 	string funcType = type_specifier->left->content;
 	string funcName = declarator->left->left->content;
@@ -591,13 +591,13 @@ struct gramTree* Praser::praser_function_definition(struct gramTree* node) {
 	}
 
 	//进入新的block
-	Block funBlock;
+	Record funBlock;
 	funBlock.isfunc = true;
 	funBlock.func.name = funcName;
 	funBlock.func.rtype = funcType;
 	funBlock.func.isdefinied = true;
 	//将函数记录在块内并添加到函数池
-	blockStack.push_back(funBlock);
+	recordStack.push_back(funBlock);
 	funcPool.insert({funcName,funBlock.func});
 
 	innerCode.addCode("FUNCTION " + funcName + " :");
@@ -628,13 +628,13 @@ struct gramTree* Praser::praser_function_definition(struct gramTree* node) {
 	praser_compound_statement(compound_statement);
 
 	//函数结束后，弹出相应的block
-	blockStack.pop_back();
+	recordStack.pop_back();
 
 	return node->right;
 }
 
 //获取函数形参列表，函数定义需要获取形参，声明则不需要
-void Praser::praser_parameter_list(struct gramTree* node,string funcName,bool definite) {
+void Praser::praser_parameter_list(struct Tree* node,string funcName,bool definite) {
 	if (node->left->name == "parameter_list") {
 		praser_parameter_list(node->left, funcName,definite);
 	}
@@ -648,10 +648,10 @@ void Praser::praser_parameter_list(struct gramTree* node,string funcName,bool de
 }
 
 //获取单个形参内容,函数定义需要获取形参，声明则不需要
-void Praser::praser_parameter_declaration(struct gramTree* node, string funcName,bool definite) {
+void Praser::praser_parameter_declaration(struct Tree* node, string funcName,bool definite) {
 	//cout << "praser_parameter_declaration" << endl;
-	gramTree* type_specifier = node->left;
-	gramTree* declarator = node->left->right;
+	Tree* type_specifier = node->left;
+	Tree* declarator = node->left->right;
 	string typeName = type_specifier->left->content;
 	if (typeName == "void") {
 		error(type_specifier->line, "Void can't definite parameter.");
@@ -664,23 +664,23 @@ void Praser::praser_parameter_declaration(struct gramTree* node, string funcName
 	newnode.type = typeName;
 	if (definite) {
 		newnode.num = innerCode.varNum++;
-		blockStack.back().func.paralist.push_back(newnode);
+		recordStack.back().func.paralist.push_back(newnode);
 	}
 
 	funcPool[funcName].paralist.push_back(newnode);
 	
 	//将函数的形参添加到当前块的变量池中
-	blockStack.back().varMap.insert({varName,newnode});
+	recordStack.back().varMap.insert({varName,newnode});
 
 	if(definite)
 		innerCode.addCode(innerCode.createCodeforParameter(newnode));
 }
 
 
-struct gramTree* Praser::praser_declaration(struct gramTree *node) {
+struct Tree* Praser::praser_declaration(struct Tree *node) {
 	//cout << "at " << node->name << endl;
 	//node = declaration
-	struct gramTree* begin = node->left;	//begin:type_specifier
+	struct Tree* begin = node->left;	//begin:type_specifier
 	if (begin->right->name == ";")
 		return node->right;
 	
@@ -689,7 +689,7 @@ struct gramTree* Praser::praser_declaration(struct gramTree *node) {
 	if (vartype == "void") {
 		error(begin->left->line,"void type can't assign to variable");	//报错
  	}
-	struct gramTree* decl = begin->right;	//init_declarator_list
+	struct Tree* decl = begin->right;	//init_declarator_list
 
 
 	/*while (decl->right) {
@@ -702,7 +702,7 @@ struct gramTree* Praser::praser_declaration(struct gramTree *node) {
 
 }
 
-void Praser::praser_init_declarator_list(string vartype, struct gramTree* node) {
+void Praser::praser_init_declarator_list(string vartype, struct Tree* node) {
 	if (node->left->name == "init_declarator_list") {
 		praser_init_declarator_list(vartype, node->left);
 	}
@@ -717,21 +717,21 @@ void Praser::praser_init_declarator_list(string vartype, struct gramTree* node) 
 
 
 //分析变量初始化
-void Praser::praser_init_declarator(string vartype, struct gramTree* node) {
+void Praser::praser_init_declarator(string vartype, struct Tree* node) {
 	//cout << "at " << node->name << endl;
-	struct gramTree* declarator = node->left;
+	struct Tree* declarator = node->left;
 
 	if (!declarator->right) {
 		//获取变量的名字
 		if (declarator->left->name == "IDENTIFIER") {
-			struct gramTree* id = declarator->left;
+			struct Tree* id = declarator->left;
 			string var = id->content;
 			if (!lookupCurruntVar(var)) {
 				varNode newvar;
 				newvar.name = var;
 				newvar.type = vartype;
 				newvar.num = innerCode.varNum++;
-				blockStack.back().varMap.insert({ var,newvar });
+				recordStack.back().varMap.insert({ var,newvar });
 			}
 			else error(declarator->left->line, "Variable multiple declaration.");
 		}
@@ -740,10 +740,10 @@ void Praser::praser_init_declarator(string vartype, struct gramTree* node) {
 			if (declarator->left->right->name == "(") {
 				string funcName = declarator->left->left->content;
 				string funcType = vartype;
-				if (blockStack.size() > 1) {
+				if (recordStack.size() > 1) {
 					error(declarator->left->right->line, "Functinon declaration must at global environment.");
 				}
-				gramTree* parameter_list = declarator->left->right->right;
+				Tree* parameter_list = declarator->left->right->right;
 				funcNode newFunc;
 				newFunc.isdefinied = false;
 				newFunc.name = funcName;
@@ -756,7 +756,7 @@ void Praser::praser_init_declarator(string vartype, struct gramTree* node) {
 			else if (declarator->left->right->name == "[") {
 				string arrayName = declarator->left->left->content;
 				string arrayType = vartype;
-				gramTree* assign_exp = declarator->left->right->right;
+				Tree* assign_exp = declarator->left->right->right;
 				varNode rnode = praser_assignment_expression(assign_exp);
 
 				if (rnode.type != "int") {
@@ -771,14 +771,14 @@ void Praser::praser_init_declarator(string vartype, struct gramTree* node) {
 					++innerCode.tempNum;
 					tnode = createTempVar(tempname, "int");
 
-					blockStack.back().varMap.insert({ tempname,tnode });
+					recordStack.back().varMap.insert({ tempname,tnode });
 
 					varNode tempVar3;
 					string tempName3 = "temp" + inttostr(innerCode.tempNum);
 					++innerCode.tempNum;
 					tempVar3.name = tempName3;
 					tempVar3.type = "int";
-					blockStack.back().varMap.insert({ tempName3,tempVar3 });
+					recordStack.back().varMap.insert({ tempName3,tempVar3 });
 
 					innerCode.addCode(tempName3 + " := #4");
 
@@ -790,14 +790,14 @@ void Praser::praser_init_declarator(string vartype, struct gramTree* node) {
 					++innerCode.tempNum;
 					tnode = createTempVar(tempname, "int");
 
-					blockStack.back().varMap.insert({ tempname,tnode });
+					recordStack.back().varMap.insert({ tempname,tnode });
 					
 					varNode tempVar3;
 					string tempName3 = "temp" + inttostr(innerCode.tempNum);
 					++innerCode.tempNum;
 					tempVar3.name = tempName3;
 					tempVar3.type = "int";
-					blockStack.back().varMap.insert({ tempName3,tempVar3 });
+					recordStack.back().varMap.insert({ tempName3,tempVar3 });
 
 					innerCode.addCode(tempName3 + " := #8");
 
@@ -814,7 +814,7 @@ void Praser::praser_init_declarator(string vartype, struct gramTree* node) {
 				anode.num = innerCode.arrayNum++;
 				innerCode.addCode("DEC " + innerCode.getarrayNodeName(anode) + " " + tnode.name);
 
-				blockStack.back().arrayMap.insert({ arrayName,anode });
+				recordStack.back().arrayMap.insert({ arrayName,anode });
 			}
 		}
 	}
@@ -823,20 +823,20 @@ void Praser::praser_init_declarator(string vartype, struct gramTree* node) {
 		//获取变量的名字
 		varNode newvar;
 		if (declarator->left->name == "IDENTIFIER") {
-			struct gramTree* id = declarator->left;
+			struct Tree* id = declarator->left;
 			string var = id->content;
 			if (!lookupCurruntVar(var)) {
 				newvar.name = var;
 				newvar.type = vartype;
 				newvar.num = innerCode.varNum++;
-				blockStack.back().varMap.insert({ var,newvar });
+				recordStack.back().varMap.insert({ var,newvar });
 			}
 			else error(declarator->left->line, "Variable multiple declaration.");
 		}
 		else error(declarator->left->line, "It's not a variable!");
 
 
-		gramTree* initializer = declarator->right->right;
+		Tree* initializer = declarator->right->right;
 		if (initializer == NULL) {
 			error(declarator->line, "Lack the initializer for variable.");
 		}
@@ -854,20 +854,20 @@ void Praser::praser_init_declarator(string vartype, struct gramTree* node) {
 	else error(declarator->right->line, "Wrong value to variable");
 }
 
-varNode Praser::praser_assignment_expression(struct gramTree* assign_exp) {	//返回变量节点
+varNode Praser::praser_assignment_expression(struct Tree* assign_exp) {	//返回变量节点
 
 	//cout << "praser_assignment_expression" << endl;
 
 	if (assign_exp->left->name == "logical_or_expression") {
-		struct gramTree* logical_or_exp = assign_exp->left;
+		struct Tree* logical_or_exp = assign_exp->left;
 
 		return praser_logical_or_expression(logical_or_exp);
 	}
 	//赋值运算
 	else if(assign_exp->left->name == "unary_expression"){
-		struct gramTree* unary_exp = assign_exp->left;
+		struct Tree* unary_exp = assign_exp->left;
 		string op = assign_exp->left->right->left->name;
-		struct gramTree* next_assign_exp = assign_exp->left->right->right;
+		struct Tree* next_assign_exp = assign_exp->left->right->right;
 		varNode node1 = praser_unary_expression(unary_exp);
 		varNode node2 = praser_assignment_expression(next_assign_exp);
 		varNode node3;
@@ -879,7 +879,7 @@ varNode Praser::praser_assignment_expression(struct gramTree* assign_exp) {	//返
 			++innerCode.tempNum;
 			node3 = createTempVar(tempname, node1.type);
 
-			blockStack.back().varMap.insert({ tempname,node3 });
+			recordStack.back().varMap.insert({ tempname,node3 });
 
 			if (op == "MUL_ASSIGN") { //*=
 				if (node1.type != node2.type) {
@@ -948,10 +948,10 @@ varNode Praser::praser_assignment_expression(struct gramTree* assign_exp) {	//返
 	}
 }
 
-varNode Praser::praser_logical_or_expression(struct gramTree* logical_or_exp) {
+varNode Praser::praser_logical_or_expression(struct Tree* logical_or_exp) {
 
 	if(logical_or_exp->left->name == "logical_and_expression"){
-		struct gramTree* logical_and_exp = logical_or_exp->left;
+		struct Tree* logical_and_exp = logical_or_exp->left;
 		return praser_logical_and_expression(logical_and_exp);
 	}
 	else if (logical_or_exp->left->name == "logical_or_expression") {
@@ -967,7 +967,7 @@ varNode Praser::praser_logical_or_expression(struct gramTree* logical_or_exp) {
 		++innerCode.tempNum;
 		varNode newnode = createTempVar(tempname, node1.type);
 
-		blockStack.back().varMap.insert({ tempname,newnode });
+		recordStack.back().varMap.insert({ tempname,newnode });
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "||", node1, node2));
 
 		newnode.boolString = innerCode.getNodeName(node1) + " || " + innerCode.getNodeName(node2);
@@ -978,10 +978,10 @@ varNode Praser::praser_logical_or_expression(struct gramTree* logical_or_exp) {
 
 }
 
-varNode Praser::praser_logical_and_expression(struct gramTree* logical_and_exp) {
+varNode Praser::praser_logical_and_expression(struct Tree* logical_and_exp) {
 	
 	if (logical_and_exp->left->name == "inclusive_or_expression") {
-		gramTree* inclusive_or_exp = logical_and_exp->left;
+		Tree* inclusive_or_exp = logical_and_exp->left;
 		return praser_inclusive_or_expression(inclusive_or_exp);
 	}
 	else if (logical_and_exp->left->name == "logical_and_expression") {
@@ -995,7 +995,7 @@ varNode Praser::praser_logical_and_expression(struct gramTree* logical_and_exp) 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newnode = createTempVar(tempname, node1.type);
-		blockStack.back().varMap.insert({ tempname,newnode });
+		recordStack.back().varMap.insert({ tempname,newnode });
 	
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "&&", node1, node2));
 
@@ -1006,10 +1006,10 @@ varNode Praser::praser_logical_and_expression(struct gramTree* logical_and_exp) 
 	}
 }
 
-varNode Praser::praser_inclusive_or_expression(struct gramTree* inclusive_or_exp) {
+varNode Praser::praser_inclusive_or_expression(struct Tree* inclusive_or_exp) {
 	
 	if (inclusive_or_exp->left->name == "exclusive_or_expression") {
-		gramTree* exclusive_or_exp = inclusive_or_exp->left;
+		Tree* exclusive_or_exp = inclusive_or_exp->left;
 		return praser_exclusive_or_expression(exclusive_or_exp);
 	}
 	else if (inclusive_or_exp->left->name == "inclusive_or_expression") {
@@ -1023,16 +1023,16 @@ varNode Praser::praser_inclusive_or_expression(struct gramTree* inclusive_or_exp
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newnode = createTempVar(tempname, node1.type);
-		blockStack.back().varMap.insert({ tempname,newnode });
+		recordStack.back().varMap.insert({ tempname,newnode });
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "|", node1, node2));
 		return newnode;
 	}
 }
 
-varNode Praser::praser_exclusive_or_expression(struct gramTree *exclusive_or_exp) {
+varNode Praser::praser_exclusive_or_expression(struct Tree *exclusive_or_exp) {
 	
 	if (exclusive_or_exp->left->name == "and_expression") {
-		gramTree* and_exp = exclusive_or_exp->left;
+		Tree* and_exp = exclusive_or_exp->left;
 		return praser_and_expression(and_exp);
 	}
 	else if (exclusive_or_exp->left->name == "exclusive_or_expression") {
@@ -1046,15 +1046,15 @@ varNode Praser::praser_exclusive_or_expression(struct gramTree *exclusive_or_exp
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newnode = createTempVar(tempname, node1.type);
-		blockStack.back().varMap.insert({ tempname,newnode });
+		recordStack.back().varMap.insert({ tempname,newnode });
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "^", node1, node2));
 		return newnode;
 	}
 }
 
-varNode Praser::praser_and_expression(struct gramTree* and_exp) {
+varNode Praser::praser_and_expression(struct Tree* and_exp) {
 	if (and_exp->left->name == "equality_expression") {
-		gramTree* equality_exp = and_exp->left;
+		Tree* equality_exp = and_exp->left;
 		return praser_equality_expression(equality_exp);
 	}
 	else if (and_exp->left->name == "and_expression") {
@@ -1070,16 +1070,16 @@ varNode Praser::praser_and_expression(struct gramTree* and_exp) {
 
 		varNode newnode = createTempVar(tempname, node1.type);
 
-		blockStack.back().varMap.insert({ tempname,newnode });
+		recordStack.back().varMap.insert({ tempname,newnode });
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "&", node1, node2));
 		return newnode;
 	}
 }
 
-varNode Praser::praser_equality_expression(struct gramTree* equality_exp) {
+varNode Praser::praser_equality_expression(struct Tree* equality_exp) {
 	
 	if (equality_exp->left->name == "relational_expression") {
-		gramTree* relational_exp = equality_exp->left;
+		Tree* relational_exp = equality_exp->left;
 		return praser_relational_expression(relational_exp);
 	}
 	else if (equality_exp->left->right->name == "EQ_OP" || equality_exp->left->right->name == "NE_OP") {
@@ -1099,7 +1099,7 @@ varNode Praser::praser_equality_expression(struct gramTree* equality_exp) {
 		++innerCode.tempNum;
 
 		varNode newnode = createTempVar(tempname, "bool");
-		blockStack.back().varMap.insert({ tempname,newnode});
+		recordStack.back().varMap.insert({ tempname,newnode});
 		innerCode.addCode(innerCode.createCodeforVar(tempname, op, node1, node2));
 
 		newnode.boolString = innerCode.getNodeName(node1) + " " + op + " " + innerCode.getNodeName(node2);
@@ -1108,9 +1108,9 @@ varNode Praser::praser_equality_expression(struct gramTree* equality_exp) {
 	}
 }
 
-varNode Praser::praser_relational_expression(struct gramTree* relational_exp) {
+varNode Praser::praser_relational_expression(struct Tree* relational_exp) {
 	if (relational_exp->left->name == "shift_expression") {
-		gramTree* shift_exp = relational_exp->left;
+		Tree* shift_exp = relational_exp->left;
 		return praser_shift_expression(shift_exp);
 	}
 	else {
@@ -1131,7 +1131,7 @@ varNode Praser::praser_relational_expression(struct gramTree* relational_exp) {
 			++innerCode.tempNum;
 
 			varNode newnode = createTempVar(tempname, "bool");
-			blockStack.back().varMap.insert({ tempname,newnode });
+			recordStack.back().varMap.insert({ tempname,newnode });
 			innerCode.addCode(innerCode.createCodeforVar(tempname, op, node1, node2));
 
 			newnode.boolString = innerCode.getNodeName(node1) + " " + op + " " + innerCode.getNodeName(node2);
@@ -1141,9 +1141,9 @@ varNode Praser::praser_relational_expression(struct gramTree* relational_exp) {
 	}
 }
 
-varNode Praser::praser_shift_expression(struct gramTree*shift_exp) {
+varNode Praser::praser_shift_expression(struct Tree*shift_exp) {
 	if (shift_exp->left->name == "additive_expression") {
-		gramTree* additive_exp = shift_exp->left;
+		Tree* additive_exp = shift_exp->left;
 		return praser_additive_expression(additive_exp);
 	}
 	else if (shift_exp->left->right->name == "LEFT_OP" || shift_exp->left->right->name == "RIGHT_OP") {
@@ -1165,16 +1165,16 @@ varNode Praser::praser_shift_expression(struct gramTree*shift_exp) {
 
 		varNode newnode = createTempVar(tempname, node1.type);
 
-		blockStack.back().varMap.insert({ tempname,newnode });
+		recordStack.back().varMap.insert({ tempname,newnode });
 
 		innerCode.addCode(innerCode.createCodeforVar(tempname, op, node1, node2));
 		return newnode;
 	}
 }
 
-varNode Praser::praser_additive_expression(struct gramTree* additive_exp) {
+varNode Praser::praser_additive_expression(struct Tree* additive_exp) {
 	if (additive_exp->left->name == "multiplicative_expression") {
-		gramTree* mult_exp = additive_exp->left;
+		Tree* mult_exp = additive_exp->left;
 		return praser_multiplicative_expression(mult_exp);
 	}
 	else if (additive_exp->left->right->name == "+" || additive_exp->left->right->name == "-") {
@@ -1188,17 +1188,17 @@ varNode Praser::praser_additive_expression(struct gramTree* additive_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newnode = createTempVar(tempname, node1.type);
-		blockStack.back().varMap.insert({ tempname,newnode});
+		recordStack.back().varMap.insert({ tempname,newnode});
 
 		innerCode.addCode(innerCode.createCodeforVar(tempname, additive_exp->left->right->name, node1, node2));
 		return newnode;
 	}
 }
 
-varNode Praser::praser_multiplicative_expression(struct gramTree* mult_exp) {
+varNode Praser::praser_multiplicative_expression(struct Tree* mult_exp) {
 
 	if (mult_exp->left->name == "unary_expression") {
-		gramTree* unary_exp = mult_exp->left;
+		Tree* unary_exp = mult_exp->left;
 		return praser_unary_expression(unary_exp);
 	}
 	else if (mult_exp->left->right->name == "*" || mult_exp->left->right->name == "/" || 
@@ -1213,7 +1213,7 @@ varNode Praser::praser_multiplicative_expression(struct gramTree* mult_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newNode = createTempVar(tempname, node1.type);
-		blockStack.back().varMap.insert({ tempname,newNode });
+		recordStack.back().varMap.insert({ tempname,newNode });
 
 		innerCode.addCode(innerCode.createCodeforVar(tempname, mult_exp->left->right->name,node1,node2));
 		return newNode;
@@ -1221,9 +1221,9 @@ varNode Praser::praser_multiplicative_expression(struct gramTree* mult_exp) {
 	}
 }
 
-varNode Praser::praser_unary_expression(struct gramTree*unary_exp) {
+varNode Praser::praser_unary_expression(struct Tree*unary_exp) {
 	if (unary_exp->left->name == "postfix_expression") {
-		gramTree* post_exp = unary_exp->left;
+		Tree* post_exp = unary_exp->left;
 		return praser_postfix_expression(post_exp);
 	}
 	else if (unary_exp->left->name == "INC_OP") {
@@ -1234,7 +1234,7 @@ varNode Praser::praser_unary_expression(struct gramTree*unary_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newNode = createTempVar(tempname, "int");
-		blockStack.back().varMap.insert({ tempname,newNode });
+		recordStack.back().varMap.insert({ tempname,newNode });
 
 		innerCode.addCode(tempname + " := #1");
 
@@ -1258,7 +1258,7 @@ varNode Praser::praser_unary_expression(struct gramTree*unary_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newNode = createTempVar(tempname, "int");
-		blockStack.back().varMap.insert({ tempname,newNode });
+		recordStack.back().varMap.insert({ tempname,newNode });
 
 		innerCode.addCode(tempname + " := #1");
 
@@ -1289,13 +1289,13 @@ varNode Praser::praser_unary_expression(struct gramTree*unary_exp) {
 			string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
 			varNode newzeronode = createTempVar(tempzeroname, rnode.type);
-			blockStack.back().varMap.insert({ tempzeroname,newzeronode });
+			recordStack.back().varMap.insert({ tempzeroname,newzeronode });
 			innerCode.addCode(tempzeroname + " := #0");
 
 			string tempname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
 			varNode newnode = createTempVar(tempname, rnode.type);
-			blockStack.back().varMap.insert({ tempname,newnode });
+			recordStack.back().varMap.insert({ tempname,newnode });
 
 
 			if (rnode.useAddress) {
@@ -1315,16 +1315,16 @@ varNode Praser::praser_unary_expression(struct gramTree*unary_exp) {
 	}
 }
 
-varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
+varNode Praser::praser_postfix_expression(struct Tree* post_exp) {
 	//cout << "here" << endl;
 	if (post_exp->left->name == "primary_expression") {
-		gramTree* primary_exp = post_exp->left;
+		Tree* primary_exp = post_exp->left;
 		return praser_primary_expression(primary_exp);
 	}
 	else if (post_exp->left->right->name == "[") {
 		//数组调用
 		string arrayName = post_exp->left->left->left->content;
-		gramTree* expression = post_exp->left->right->right;
+		Tree* expression = post_exp->left->right->right;
 		varNode enode = praser_expression(expression);
 		arrayNode anode = getArrayNode(arrayName);
 
@@ -1337,7 +1337,7 @@ varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
 		tempVar.name = tempName;
 		tempVar.type = anode.type;
 		tempVar.useAddress = true;
-		blockStack.back().varMap.insert({tempName,tempVar});
+		recordStack.back().varMap.insert({tempName,tempVar});
 
 
 		if (anode.type == "int" || anode.type == "double") {
@@ -1346,7 +1346,7 @@ varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
 			++innerCode.tempNum;
 			tempVar2.name = tempName2;
 			tempVar2.type = "int";
-			blockStack.back().varMap.insert({ tempName2,tempVar2 });
+			recordStack.back().varMap.insert({ tempName2,tempVar2 });
 
 			if (anode.type == "int") {
 
@@ -1355,7 +1355,7 @@ varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
 				++innerCode.tempNum;
 				tempVar3.name = tempName3;
 				tempVar3.type = "int";
-				blockStack.back().varMap.insert({ tempName3,tempVar3 });
+				recordStack.back().varMap.insert({ tempName3,tempVar3 });
 
 				innerCode.addCode(tempName3 + " := #4");
 
@@ -1367,7 +1367,7 @@ varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
 				++innerCode.tempNum;
 				tempVar3.name = tempName3;
 				tempVar3.type = "int";
-				blockStack.back().varMap.insert({ tempName3,tempVar3 });
+				recordStack.back().varMap.insert({ tempName3,tempVar3 });
 
 				innerCode.addCode(tempName3 + " := #8");
 
@@ -1391,7 +1391,7 @@ varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
 		}
 
 		if (post_exp->left->right->right->name == "argument_expression_list") {
-			gramTree* argument_exp_list = post_exp->left->right->right;
+			Tree* argument_exp_list = post_exp->left->right->right;
 			praser_argument_expression_list(argument_exp_list, funcName);
 			//cout << "funcCall" << endl;
 
@@ -1423,12 +1423,12 @@ varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newnode = createTempVar(tempname, "int");
-		blockStack.back().varMap.insert({ tempname,newnode });
+		recordStack.back().varMap.insert({ tempname,newnode });
 
 		string tempnameone = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newNode = createTempVar(tempnameone, "int");
-		blockStack.back().varMap.insert({ tempnameone,newNode });
+		recordStack.back().varMap.insert({ tempnameone,newNode });
 
 		innerCode.addCode(tempnameone + " := #1");
 
@@ -1454,12 +1454,12 @@ varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newnode = createTempVar(tempname, "int");
-		blockStack.back().varMap.insert({ tempname,newnode });
+		recordStack.back().varMap.insert({ tempname,newnode });
 
 		string tempnameone = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newNode = createTempVar(tempnameone, "int");
-		blockStack.back().varMap.insert({ tempnameone,newNode });
+		recordStack.back().varMap.insert({ tempnameone,newNode });
 
 		innerCode.addCode(tempnameone + " := #1");
 
@@ -1477,8 +1477,8 @@ varNode Praser::praser_postfix_expression(struct gramTree* post_exp) {
 	}
 }
 
-void Praser::praser_argument_expression_list(struct gramTree* node, string funcName) {
-	gramTree* argu_exp_list = node->left;
+void Praser::praser_argument_expression_list(struct Tree* node, string funcName) {
+	Tree* argu_exp_list = node->left;
 	funcNode func = funcPool[funcName];
 	int i = 0;
 	while (argu_exp_list->name == "argument_expression_list") {
@@ -1503,7 +1503,7 @@ void Praser::praser_argument_expression_list(struct gramTree* node, string funcN
 	}
 }
 
-varNode Praser::praser_primary_expression(struct gramTree* primary_exp) {
+varNode Praser::praser_primary_expression(struct Tree* primary_exp) {
 	if (primary_exp->left->name == "IDENTIFIER") {
 		string content = primary_exp->left->content;
 		varNode rnode = lookupNode(content);
@@ -1517,7 +1517,7 @@ varNode Praser::praser_primary_expression(struct gramTree* primary_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		varNode newNode = createTempVar(tempname, "bool");
-		blockStack.back().varMap.insert({ tempname,newNode });
+		recordStack.back().varMap.insert({ tempname,newNode });
 		if(primary_exp->left->name == "TRUE") 
 			innerCode.addCode(tempname + " := #1");
 		else {
@@ -1531,7 +1531,7 @@ varNode Praser::praser_primary_expression(struct gramTree* primary_exp) {
 		++innerCode.tempNum;
 		
 		varNode newNode = createTempVar(tempname, "int");
-		blockStack.back().varMap.insert({ tempname,newNode });
+		recordStack.back().varMap.insert({ tempname,newNode });
 		innerCode.addCode(tempname + " := #"  + content);
 		return newNode;
 	}
@@ -1542,12 +1542,12 @@ varNode Praser::praser_primary_expression(struct gramTree* primary_exp) {
 
 		varNode newNode = createTempVar(tempname, "double");
 
-		blockStack.back().varMap.insert({ tempname,newNode});
+		recordStack.back().varMap.insert({ tempname,newNode});
 		innerCode.addCode(tempname + " := F" + content);
 		return newNode;
 	}
 	else if (primary_exp->left->name == "(") {
-		struct gramTree* expression = primary_exp->left->right;
+		struct Tree* expression = primary_exp->left->right;
 		return praser_expression(expression);
 	}
 }
@@ -1555,23 +1555,23 @@ varNode Praser::praser_primary_expression(struct gramTree* primary_exp) {
 
 //全局查找
 string Praser::lookupVar(string name) {
-	int N = blockStack.size();
+	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
-		if (blockStack[i].varMap.find(name) != blockStack[i].varMap.end())
-			return blockStack[i].varMap[name].type;
+		if (recordStack[i].varMap.find(name) != recordStack[i].varMap.end())
+			return recordStack[i].varMap[name].type;
 	}
 	return "";
 }
 //当前块查找
 bool Praser::lookupCurruntVar(string name) {
-	return blockStack.back().varMap.find(name) != blockStack.back().varMap.end();
+	return recordStack.back().varMap.find(name) != recordStack.back().varMap.end();
 }
 
 struct varNode Praser::lookupNode(string name) {
-	int N = blockStack.size();
+	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
-		if (blockStack[i].varMap.find(name) != blockStack[i].varMap.end())
-			return blockStack[i].varMap[name];
+		if (recordStack[i].varMap.find(name) != recordStack[i].varMap.end())
+			return recordStack[i].varMap[name];
 	}
 	varNode temp;
 	temp.num = -1;
@@ -1579,38 +1579,38 @@ struct varNode Praser::lookupNode(string name) {
 }
 
 string Praser::getFuncRType() {
-	int N = blockStack.size();
+	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
-		if (blockStack[i].isfunc)
-			return blockStack[i].func.rtype;
+		if (recordStack[i].isfunc)
+			return recordStack[i].func.rtype;
 	}
 	return "";
 }
 
 string Praser::getArrayType(string name) {
-	int N = blockStack.size();
+	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
-		if (blockStack[i].arrayMap.find(name) != blockStack[i].arrayMap.end())
-			return blockStack[i].arrayMap[name].type;
+		if (recordStack[i].arrayMap.find(name) != recordStack[i].arrayMap.end())
+			return recordStack[i].arrayMap[name].type;
 	}
 	return "";
 }
 
 struct arrayNode Praser::getArrayNode(string name) {
-	int N = blockStack.size();
+	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
-		if (blockStack[i].arrayMap.find(name) != blockStack[i].arrayMap.end())
-			return blockStack[i].arrayMap[name];
+		if (recordStack[i].arrayMap.find(name) != recordStack[i].arrayMap.end())
+			return recordStack[i].arrayMap[name];
 	}
 	arrayNode temp;
 	temp.num = -1;
 	return temp;
 }
 
-int Praser::getBreakBlockNumber() {
-	int N = blockStack.size();
+int Praser::getBreakRecordNumber() {
+	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
-		if (blockStack[i].canBreak)
+		if (recordStack[i].canBreak)
 			return i;
 	}
 	return -1;
@@ -1634,10 +1634,10 @@ struct varNode Praser::createTempVar(string name, string type) {
 }
 
 void Praser::print_map() {
-	int N = blockStack.size();
+	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
 		cout << "Block " << i << endl;
-		for (auto it = blockStack[i].varMap.begin(); it != blockStack[i].varMap.end(); it++) {
+		for (auto it = recordStack[i].varMap.begin(); it != recordStack[i].varMap.end(); it++) {
 			cout << "     " << it->first << " " << it->second.type << endl;
 		}
 	}

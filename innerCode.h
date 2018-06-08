@@ -3,10 +3,10 @@
 
 #include <iostream>
 #include "tree.h"
-#include "block.h"
+#include "record.h"
 #include "codeOptimize.h"
 #include<string>
-extern struct gramTree* root;
+extern struct Tree* root;
 
 using namespace std;
 

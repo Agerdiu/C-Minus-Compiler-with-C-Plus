@@ -1,41 +1,41 @@
 #include"tree.h"
 #include"tools.h"
 
-gramTree* create_tree(string name, int num,...) {
+Tree* createTree(string name, int num,...) {
     va_list valist;
-    gramTree* head = new gramTree();
-    if(!head) {
+    Tree* root = new Tree();
+    if(!root) {
         printf("Out of space \n");
         exit(0);
     }   
-    head->left = NULL;
-    head->right = NULL;
-    head->content = "";
-    gramTree* temp = NULL;
-    head->name = name;
+    root->left = NULL;
+    root->right = NULL;
+    root->content = "";
+    Tree* temp = NULL;
+    root->name = name;
     va_start(valist,num);
     if(num > 0) {
-        temp = va_arg(valist,gramTree*);
-        head->left = temp;
-        head->line = temp->line;
+        temp = va_arg(valist,Tree*);
+        root->left = temp;
+        root->line = temp->line;
         if(num == 1) {
             //head->content = temp->content;
             if(temp->content.size() > 0) {
-                head->content = temp->content;
+                root->content = temp->content;
             }
-            else head->content = "";
+            else root->content = "";
         }
         else {
             for(int i = 1; i < num; ++i ) {
-                temp->right = va_arg(valist,gramTree*);
+                temp->right = va_arg(valist,Tree*);
                 temp = temp->right;
             }
         }
     }
     else {
         int line = va_arg(valist,int);
-        head->line = line;
-        if(head->name == "CONSTANT_INT") {
+        root->line = line;
+        if(root->name == "CONSTANT_INT") {
            int value;
            if(strlen(yytext) > 1 && yytext[0] == '0' && yytext[1] != 'x') {
                sscanf(yytext,"%o",&value); //8进制整数
@@ -44,70 +44,70 @@ gramTree* create_tree(string name, int num,...) {
                sscanf(yytext,"%x",&value); //16进制整数
            }
            else value = atoi(yytext);      //10进制整数
-           head->content = inttostr(value);
+           root->content = inttostr(value);
            //printf("%d",value);
         }
-        else if(head->name == "CONSTANT_DOUBLE") {
-           head->content = yytext;
+        else if(root->name == "CONSTANT_DOUBLE") {
+           root->content = yytext;
         }
-        else if(head->name == "TRUE") {
-           head->content = inttostr(1);
+        else if(root->name == "TRUE") {
+           root->content = inttostr(1);
         }
-        else if(head->name == "FALSE") {
-           head->content = inttostr(0);
+        else if(root->name == "FALSE") {
+           root->content = inttostr(0);
         }
-        else if(head->name == "STRING_LITERAL") {
-           head->content = yytext;
+        else if(root->name == "STRING_LITERAL") {
+           root->content = yytext;
         }
         else {
-            head->content = yytext;
+            root->content = yytext;
         }
     
     }
-    return head;
+    return root;
 }
 
-void eval(gramTree *head,int leavel) {
-    if(head!=NULL) {
-        string Name = head->name;
-        if(head->line!=-1) {
+void print(Tree *root,int leavel) {
+    if(root!=NULL) {
+        string Name = root->name;
+        if(root->line!=-1) {
             for(int i=0;i<leavel;++i) {
                 cout << ". ";
             }
-           cout << head->name;
+           cout << root->name;
         
-            if(head->name == "IDENTIFIER"||head->name == "BOOL"|| head->name == "INT" || 
-            head->name == "CHAR" || head->name == "DOUBLE") {
-                cout << ":" << head->content;
+            if(root->name == "IDENTIFIER"||root->name == "BOOL"|| root->name == "INT" || 
+            root->name == "CHAR" || root->name == "DOUBLE") {
+                cout << ":" << root->content;
             }
-            else if(head->name == "CONSTANT_INT" || head->name == "TRUE" || head->name == "FALSE") {
-                cout << ":" << head->content << " ";
+            else if(root->name == "CONSTANT_INT" || root->name == "TRUE" || root->name == "FALSE") {
+                cout << ":" << root->content << " ";
             }
-            else if(head->name == "CONSTANT_DOUBLE") {
-                cout << ":" << head->content << " ";
+            else if(root->name == "CONSTANT_DOUBLE") {
+                cout << ":" << root->content << " ";
             }
-            else if(head->name=="STRING_LITERAL") {
-                cout << ":" << head->content;
+            else if(root->name=="STRING_LITERAL") {
+                cout << ":" << root->content;
             }
             else {
-                cout << " <" << head->line << ">";
+                cout << " <" << root->line << ">";
             }
             cout << endl;
         }
-        eval(head->left,leavel+1);
-        eval(head->right,leavel);
+        print(root->left,leavel+1);
+        print(root->right,leavel);
     }
 }
 
-void freeGramTree(gramTree* node) {
+void freeTree(Tree* node) {
 	if (node == NULL)
 		return;
-	freeGramTree(node->left);
+	freeTree(node->left);
 	delete node;
-	freeGramTree(node->right);
+	freeTree(node->right);
 }
 
-char* my_substring(char* s, int begin, int end) {
+char* substring(char* s, int begin, int end) {
     char* result = (char*)malloc(end - begin + 1);
     int i;
     for(i = begin; i < end; i++) {

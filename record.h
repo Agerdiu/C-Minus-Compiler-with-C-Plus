@@ -1,5 +1,5 @@
-#ifndef _BLOCK_H_
-#define _BLOCK_H_
+#ifndef _RECORD_H_
+#define _RECORD_H_
 
 #include<iostream>
 #include<string>
@@ -36,7 +36,7 @@ struct arrayNode {
 
 
 //block的内容
-class Block {
+class Record {
 public:
 	funcNode func;	//如果是函数，记录函数名
 	bool isfunc = false;//记录是否是函数
