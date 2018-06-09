@@ -3,15 +3,15 @@
 #include <cstdio>
 #include <string>
 #include "tree.h"
-#include "block.h"
-#include "Praser.h"
+#include "record.h"
+#include "Parser.h"
 using namespace std;
 
 extern char *yytext;
 extern int column;
 extern FILE * yyin;
 extern FILE * yyout;
-gramTree *root;
+Tree *root;
 extern int yylineno;
 
 int yylex(void);
@@ -19,7 +19,7 @@ void yyerror(const char*);
 %}
 
 %union{
-	struct gramTree* gt;
+	struct Tree* gt;
 }
 
 %token <gt> IDENTIFIER CONSTANT STRING_LITERAL SIZEOF CONSTANT_INT CONSTANT_DOUBLE
@@ -748,11 +748,11 @@ int main(int argc,char* argv[]) {
 	//freopen("output/output.txt","w", stdout);
 	yyparse();
 	printf("\n");
-	print(root,0);	//输出语法分析树
+	//print(root,0);	//输出语法分析树
 
-	Praser praser(root);
+	Parser parser(root);
 
-	freeGramTree(root);
+	freeTree(root);
 
 	fclose(yyin);
 	return 0;

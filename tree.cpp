@@ -1,6 +1,49 @@
 #include"tree.h"
 #include"tools.h"
 
+
+//void print(Tree *root, int leavel) {
+//	if (root != NULL) {
+//		string Name = root->name;
+//		if (root->line != -1) {
+//			for (int i = 0; i<leavel; ++i) {
+//				cout << ". ";
+//			}
+//			cout << root->name;
+//
+//			if (root->name == "IDENTIFIER" || root->name == "BOOL" || root->name == "INT" ||root->name == "CHAR" || root->name == "DOUBLE") {
+//				cout << ":" << root->content;
+//			}
+//			else if (root->name == "CONSTANT_INT" || root->name == "TRUE" || root->name == "FALSE") {
+//				cout << ":" << root->content << " ";
+//			}
+//			else if (root->name == "CONSTANT_DOUBLE") {
+//				cout << ":" << root->content << " ";
+//			}
+//			else if (root->name == "STRING_LITERAL") {
+//				cout << ":" << root->content;
+//			}
+//			else {
+//				cout << " <" << root->line << ">";
+//			}
+//			cout << endl;
+//		}
+//		print(root->left, leavel + 1);
+//		print(root->right, leavel);
+//	}
+//}
+
+
+void freeTree(Tree* node) {
+	if (node == NULL)
+		return;
+	freeTree(node->left);
+	delete node;
+	freeTree(node->right);
+}
+
+
+
 Tree* createTree(string name, int num,...) {
     va_list valist;
     Tree* root = new Tree();
@@ -65,54 +108,4 @@ Tree* createTree(string name, int num,...) {
     
     }
     return root;
-}
-
-void print(Tree *root,int leavel) {
-    if(root!=NULL) {
-        string Name = root->name;
-        if(root->line!=-1) {
-            for(int i=0;i<leavel;++i) {
-                cout << ". ";
-            }
-           cout << root->name;
-        
-            if(root->name == "IDENTIFIER"||root->name == "BOOL"|| root->name == "INT" || 
-            root->name == "CHAR" || root->name == "DOUBLE") {
-                cout << ":" << root->content;
-            }
-            else if(root->name == "CONSTANT_INT" || root->name == "TRUE" || root->name == "FALSE") {
-                cout << ":" << root->content << " ";
-            }
-            else if(root->name == "CONSTANT_DOUBLE") {
-                cout << ":" << root->content << " ";
-            }
-            else if(root->name=="STRING_LITERAL") {
-                cout << ":" << root->content;
-            }
-            else {
-                cout << " <" << root->line << ">";
-            }
-            cout << endl;
-        }
-        print(root->left,leavel+1);
-        print(root->right,leavel);
-    }
-}
-
-void freeTree(Tree* node) {
-	if (node == NULL)
-		return;
-	freeTree(node->left);
-	delete node;
-	freeTree(node->right);
-}
-
-char* substring(char* s, int begin, int end) {
-    char* result = (char*)malloc(end - begin + 1);
-    int i;
-    for(i = begin; i < end; i++) {
-        result[i - begin] = s[i];
-    }
-    result[i - begin] = 0;
-    return result;
 }

@@ -100,7 +100,7 @@
     <ClCompile Include="record.cpp" />
     <ClCompile Include="codeOptimize.cpp" />
     <ClCompile Include="innerCode.cpp" />
-    <ClCompile Include="Praser.cpp" />
+    <ClCompile Include="Parser.cpp" />
     <ClCompile Include="tools.cpp" />
     <ClCompile Include="tree.cpp" />
   </ItemGroup>
@@ -108,7 +108,7 @@
     <ClInclude Include="record.h" />
     <ClInclude Include="codeOptimize.h" />
     <ClInclude Include="innerCode.h" />
-    <ClInclude Include="Praser.h" />
+    <ClInclude Include="Parser.h" />
     <ClInclude Include="tools.h" />
     <ClInclude Include="tree.h" />
   </ItemGroup>

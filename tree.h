@@ -23,8 +23,7 @@ struct Tree {
 extern struct Tree *root;
 
 struct Tree* createTree(string name, int num,...);
-void print(struct Tree *head,int leavel);
-char* substring(char* s, int begin, int end);
+//void print(struct Tree *head,int leavel);
 void freeTree(Tree* node);
 
 #endif

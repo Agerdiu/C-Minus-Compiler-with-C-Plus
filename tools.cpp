@@ -4,8 +4,8 @@
 string inttostr(int n) {
 	char buf[10];
 	sprintf(buf, "%d", n);
-	string b = buf;
-	return b;
+	string str = buf;
+	return str;
 }
 
 int strtoint(string s) {
