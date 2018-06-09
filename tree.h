@@ -20,12 +20,10 @@ struct Tree {
     struct Tree *right;
 };
 
-typedef struct Tree* TreePtr;
+extern struct Tree *root;
 
-extern TreePtr root;
-
-TreePtr createTree(string name, int num,...);
+struct Tree* createTree(string name, int num,...);
 //void print(struct Tree *head,int leavel);
-void freeTree(TreePtr node);
+void freeTree(Tree* node);
 
 #endif

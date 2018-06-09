@@ -34,7 +34,7 @@
 //}
 
 
-void freeTree(TreePtr node) {
+void freeTree(Tree* node) {
 	if (node == NULL)
 		return;
 	freeTree(node->left);
@@ -44,9 +44,9 @@ void freeTree(TreePtr node) {
 
 
 
-TreePtr createTree(string name, int num,...) {
+Tree* createTree(string name, int num,...) {
     va_list valist;
-	TreePtr root = new Tree();
+    Tree* root = new Tree();
     if(!root) {
         printf("Out of space \n");
         exit(0);
@@ -54,11 +54,11 @@ TreePtr createTree(string name, int num,...) {
     root->left = NULL;
     root->right = NULL;
     root->content = "";
-	TreePtr temp = NULL;
+    Tree* temp = NULL;
     root->name = name;
     va_start(valist,num);
     if(num > 0) {
-        temp = va_arg(valist, TreePtr);
+        temp = va_arg(valist,Tree*);
         root->left = temp;
         root->line = temp->line;
         if(num == 1) {
@@ -70,7 +70,7 @@ TreePtr createTree(string name, int num,...) {
         }
         else {
             for(int i = 1; i < num; ++i ) {
-                temp->right = va_arg(valist, TreePtr);
+                temp->right = va_arg(valist,Tree*);
                 temp = temp->right;
             }
         }
