@@ -10,7 +10,7 @@ Parser::Parser(TreePtr root) {
 }
 
 Parser::~Parser() {
-	print_code();
+	innerCode.printCode();
 }
 
 void Parser::Init() {
@@ -20,16 +20,16 @@ void Parser::Init() {
 	//事先内置函数print和read
 	funcNode printFunc;
 	printFunc.name = "print";
-	printFunc.rtype = "void";
-	varNode pnode;
-	pnode.type = "int";
-	printFunc.paralist.push_back(pnode);
+	printFunc.returnType = "void";
+	varNode printParam;
+	printParam.type = "int";
+	printFunc.paralist.push_back(printParam);
 
 	funcPool.insert({ "print", printFunc });
 
 	funcNode readFunc;
 	readFunc.name = "read";
-	readFunc.rtype = "int";
+	readFunc.returnType = "int";
 	funcPool.insert({"read",readFunc });
 
 	parseTree(root);		//开始分析语法树
@@ -56,11 +56,241 @@ void Parser::parseTree(TreePtr node) {
 	}
 }
 
+TreePtr Parser::parserDeclaration(TreePtr node) {
+	TreePtr root = node->left;	//begin:type_specifier
+	if (root->right->name == ";")
+		return node->right;
+
+	string type = root->left->content;
+	if (type == "void") {
+		printError(root->left->line, "type match error(void - variable)");	//报错
+	}
+	TreePtr declarator = root->right;	
+	parserInitDeclaratorList(type, declarator);
+	return node->right;
+}
+
+void Parser::parserInitDeclaratorList(string type, TreePtr node) {
+	if (node->left->name == "init_declarator_list") {
+		parserInitDeclaratorList(type, node->left);
+	}
+	else if (node->left->name == "init_declarator") {
+		parserInitDeclarator(type, node->left);
+	}
+	if (node->right->name == ",") {
+		parserInitDeclarator(type, node->right->right);
+	}
+}
+
+
+//分析变量初始化
+void Parser::parserInitDeclarator(string type, TreePtr node) {
+	TreePtr declarator = node->left;
+
+	if (declarator->right!=NULL) {
+		//获取变量的名字
+		if (declarator->left->name == "IDENTIFIER") {
+			TreePtr varTemp = declarator->left;
+			string varContent = varTemp->content;
+			if (!findCurruntVar(varContent)) {
+				varNode newvar;
+				newvar.name = varContent;
+				newvar.type = type;
+				newvar.num = innerCode.varNum++;
+				recordStack.back().varMap.insert({ varContent,newvar });
+			}
+			else printError(declarator->left->line, "Variable multiple declaration.");
+		}
+		else {
+			//函数声明
+			if (declarator->left->right->name == "(") {
+				string funcName = declarator->left->left->content;
+				if (recordStack.size() > 1) {
+					printError(declarator->left->right->line, "Functinon declaration must at global environment.");
+				}
+				TreePtr parameter_list = declarator->left->right->right;
+				funcNode newFunc;
+				newFunc.isdefinied = false;
+				newFunc.name = funcName;
+				newFunc.returnType = type;
+				funcPool.insert({ funcName,newFunc });
+				//分析函数形参列表
+				parserParameterList(parameter_list, funcName, false);
+			}
+			//数组声明
+			else if (declarator->left->right->name == "[") {
+				string arrayName = declarator->left->left->content;
+				string arrayType = type;
+				TreePtr assign_exp = declarator->left->right->right;
+				varNode rnode = parserAssignmentExpression(assign_exp);
+
+				if (rnode.type != "int") {
+					printError(declarator->left->right->line, "Array size must be int.");
+				}
+				varNode tnode;
+				if (arrayType == "int") {
+					//创建一个新的临时变量来储存数组的大小
+					string tempname = "temp" + inttostr(innerCode.tempNum);
+					++innerCode.tempNum;
+					tnode = createVar(tempname, "int");
+
+					recordStack.back().varMap.insert({ tempname,tnode });
+
+					varNode tempVar3;
+					string tempName3 = "temp" + inttostr(innerCode.tempNum);
+					++innerCode.tempNum;
+					tempVar3.name = tempName3;
+					tempVar3.type = "int";
+					recordStack.back().varMap.insert({ tempName3,tempVar3 });
+
+					innerCode.addCode(tempName3 + " := #4");
+
+					innerCode.addCode(tnode.name + " := " + tempName3 + " * " + rnode.name);
+				}
+				else if (arrayType == "double") {
+					//创建一个新的临时变量来储存数组的大小
+					string tempname = "temp" + inttostr(innerCode.tempNum);
+					++innerCode.tempNum;
+					tnode = createVar(tempname, "int");
+
+					recordStack.back().varMap.insert({ tempname,tnode });
+
+					varNode tempVar3;
+					string tempName3 = "temp" + inttostr(innerCode.tempNum);
+					++innerCode.tempNum;
+					tempVar3.name = tempName3;
+					tempVar3.type = "int";
+					recordStack.back().varMap.insert({ tempName3,tempVar3 });
+
+					innerCode.addCode(tempName3 + " := #8");
+
+					innerCode.addCode(tnode.name + " := " + tempName3 + " * " + rnode.name);
+				}
+				else if (arrayType == "bool") {
+					tnode = rnode;
+				}
+
+				arrayNode anode;
+				anode.name = arrayName;
+				anode.type = arrayType;
+				anode.num = innerCode.arrayNum++;
+				innerCode.addCode("DEC " + innerCode.getarrayNodeName(anode) + " " + tnode.name);
+
+				recordStack.back().arrayMap.insert({ arrayName,anode });
+			}
+		}
+	}
+	//有初始化
+	else if (declarator->right->name == "=") {
+		//获取变量的名字
+		varNode newvar;
+		if (declarator->left->name == "IDENTIFIER") {
+			TreePtr id = declarator->left;
+			string var = id->content;
+			if (!findCurruntVar(var)) {
+				newvar.name = var;
+				newvar.type = type;
+				newvar.num = innerCode.varNum++;
+				recordStack.back().varMap.insert({ var,newvar });
+			}
+			else printError(declarator->left->line, "Variable multiple declaration.");
+		}
+		else printError(declarator->left->line, "It's not a variable!");
+
+
+		TreePtr initializer = declarator->right->right;
+		if (initializer == NULL) {
+			printError(declarator->line, "Lack the initializer for variable.");
+		}
+		else {
+			if (initializer->left->name == "assignment_expression") {
+				varNode rnode = parserAssignmentExpression(initializer->left);
+				innerCode.addCode(innerCode.createCodeforAssign(newvar, rnode));
+				string rtype = rnode.type;
+				if (rtype != type)
+					printError(initializer->left->line, "Wrong type to variable " + declarator->left->content + ": " +
+						rtype + " to " + type);
+			}
+		}
+	}
+	else printError(declarator->right->line, "Wrong value to variable");
+}
+
+//函数定义
+TreePtr Parser::parserFunctionDefinition(TreePtr node) {
+	TreePtr type_specifier = node->left;
+	TreePtr declarator = node->left->right;
+	TreePtr compound_statement = declarator->right;
+
+	string funcType = type_specifier->left->content;
+	string funcName = declarator->left->left->content;
+
+	/*if (build_in_function.find(funcName) != build_in_function.end()) {
+	error(declarator->left->left->line, "Function name can't be bulid in function.");
+	}*/
+
+	bool isdeclared = false;
+	funcNode declarFunc;
+	if (funcPool.find(funcName) != funcPool.end()) {
+		//函数重复定义
+		if (funcPool[funcName].isdefinied) {
+			printError(declarator->left->left->line, "Function " + funcName + " is duplicated definition.");
+		}
+		//函数事先声明过但是没有定义
+		else {
+			isdeclared = true;
+			//先删除掉函数池中的函数的声明
+			declarFunc = funcPool[funcName];
+			funcPool.erase(funcPool.find(funcName));
+		}
+	}
+
+	//进入新的block
+	Record funRecord;
+	funRecord.isfunc = true;
+	funRecord.func.name = funcName;
+	funRecord.func.returnType = funcType;
+	funRecord.func.isdefinied = true;
+	//将函数记录在块内并添加到函数池
+	recordStack.push_back(funRecord);
+	funcPool.insert({ funcName,funRecord.func });
+
+	innerCode.addCode("FUNCTION " + funcName + " :");
+
+	//获取函数形参列表
+	if (declarator->left->right->right->name == "parameter_list")
+		parserParameterList(declarator->left->right->right, funcName, true);
+
+	//此时函数池中的func已经添加了参数列表
+	funcNode func = funcPool[funcName];
+	//如果函数事先声明过，则比较函数的参数列表和返回类型
+	if (isdeclared) {
+		if (func.returnType != declarFunc.returnType) {
+			printError(type_specifier->left->line, "Function return type doesn't equal to the function declared before.");
+		}
+		cout << funRecord.func.paralist.size() << endl;
+		if (func.paralist.size() != declarFunc.paralist.size()) {
+			printError(declarator->left->right->right->line, "The number of function parameters doesn't equal to the function declared before.");
+		}
+		for (int i = 0; i < funRecord.func.paralist.size(); i++) {
+			if (func.paralist[i].type != declarFunc.paralist[i].type)
+				printError(declarator->left->right->right->line, "The parameter " + funRecord.func.paralist[i].name + "'s type doesn't equal to the function declared before.");
+		}
+	}
+	//更新Block中func的参数列表
+	funRecord.func = func;
+	//分析函数的正文
+	parserCompoundStatement(compound_statement);
+
+	//函数结束后，弹出相应的block
+	recordStack.pop_back();
+
+	return node->right;
+}
+
+
 TreePtr Parser::parserStatement(TreePtr node) {
 	TreePtr next = node->left;
-	if (node->left->name == "labeled_statement") {
-
-	}
 	if (node->left->name == "compound_statement") {
 		parserCompoundStatement(node->left);
 	}
@@ -90,7 +320,7 @@ void Parser::parserJumpStatement(TreePtr node) {
 		innerCode.addCode("GOTO " + recordStack[recordNum].breakLabel);
 	}
 	else if (node->left->name == "RETURN") {
-		string funcType = getFuncRType();
+		string funcType = getReturnType();
 		if (node->left->right->name == "expression") {//return expression
 			varNode rnode = parserExpression(node->left->right);
 			innerCode.addCode(innerCode.createCodeforReturn(rnode));
@@ -101,7 +331,7 @@ void Parser::parserJumpStatement(TreePtr node) {
 		else if (node->left->right->name == ";"){//return ;
 			innerCode.addCode("RETURN");
 			if (funcType != "void") {
-				printError(node->left->right->line, "You should return " + recordStack.back().func.rtype);
+				printError(node->left->right->line, "You should return " + recordStack.back().func.returnType);
 			}
 		}
 	}
@@ -132,17 +362,15 @@ void Parser::parserCompoundStatement(TreePtr node) {
 
 //if else
 void Parser::parserSelectionStatement(TreePtr node) {
-
-
 	if (node->left->name == "IF") {
 		if (node->left->right->right->right->right->right == NULL) {
 			//添加一个新的block
 			Record newrecord;
 			recordStack.push_back(newrecord);
 
-			Tree* expression = node->left->right->right;
+			TreePtr expression = node->left->right->right;
 			varNode exp_rnode = parserExpression(expression);
-			Tree* statement = node->left->right->right->right->right;
+			TreePtr statement = node->left->right->right->right->right;
 
 			string label1 = innerCode.getLabelName();
 			string label2 = innerCode.getLabelName();
@@ -176,10 +404,10 @@ void Parser::parserSelectionStatement(TreePtr node) {
 			Record newrecord1;
 			recordStack.push_back(newrecord1);
 
-			Tree* expression = node->left->right->right;
+			TreePtr expression = node->left->right->right;
 			varNode exp_rnode = parserExpression(expression);
-			Tree* statement1 = node->left->right->right->right->right;
-			Tree* statement2 = node->left->right->right->right->right->right->right;
+			TreePtr statement1 = node->left->right->right->right->right;
+			TreePtr statement2 = node->left->right->right->right->right->right->right;
 
 			string label1 = innerCode.getLabelName();
 			string label2 = innerCode.getLabelName();
@@ -320,9 +548,9 @@ void Parser::parserIterationStatement(TreePtr node) {
 				newblock.canBreak = true;
 				recordStack.push_back(newblock);
 
-				Tree* exp_state1 = node->left->right->right;
-				Tree* exp_state2 = exp_state1->right;
-				Tree* statement = exp_state2->right->right;
+				TreePtr exp_state1 = node->left->right->right;
+				TreePtr exp_state2 = exp_state1->right;
+				TreePtr statement = exp_state2->right->right;
 
 				string label1 = innerCode.getLabelName();
 				string label2 = innerCode.getLabelName();
@@ -377,10 +605,10 @@ void Parser::parserIterationStatement(TreePtr node) {
 				newblock.canBreak = true;
 				recordStack.push_back(newblock);
 
-				Tree* exp_state1 = node->left->right->right;
-				Tree* exp_state2 = exp_state1->right;
-				Tree* exp = exp_state2->right;
-				Tree* statement = exp->right->right;
+				TreePtr exp_state1 = node->left->right->right;
+				TreePtr exp_state2 = exp_state1->right;
+				TreePtr exp = exp_state2->right;
+				TreePtr statement = exp->right->right;
 
 				string label1 = innerCode.getLabelName();
 				string label2 = innerCode.getLabelName();
@@ -553,77 +781,6 @@ void Parser::parserIterationStatement(TreePtr node) {
 	}
 }
 
-//函数定义
-TreePtr Parser::parserFunctionDefinition(TreePtr node) {
-	Tree* type_specifier = node->left;
-	Tree* declarator = node->left->right;
-	Tree* compound_statement = declarator->right;
-	
-	string funcType = type_specifier->left->content;
-	string funcName = declarator->left->left->content;
-
-	/*if (build_in_function.find(funcName) != build_in_function.end()) {
-		error(declarator->left->left->line, "Function name can't be bulid in function.");
-	}*/
-
-	bool isdeclared = false;
-	funcNode declarFunc;
-	if (funcPool.find(funcName) != funcPool.end()) {
-		//函数重复定义
-		if (funcPool[funcName].isdefinied) {
-			printError(declarator->left->left->line, "Function " + funcName + " is duplicated definition.");
-		}
-		//函数事先声明过但是没有定义
-		else {
-			isdeclared = true;
-			//先删除掉函数池中的函数的声明
-			declarFunc = funcPool[funcName];
-			funcPool.erase(funcPool.find(funcName));
-		}
-	}
-
-	//进入新的block
-	Record funBlock;
-	funBlock.isfunc = true;
-	funBlock.func.name = funcName;
-	funBlock.func.rtype = funcType;
-	funBlock.func.isdefinied = true;
-	//将函数记录在块内并添加到函数池
-	recordStack.push_back(funBlock);
-	funcPool.insert({funcName,funBlock.func});
-
-	innerCode.addCode("FUNCTION " + funcName + " :");
-
-	//获取函数形参列表
-	if(declarator->left->right->right->name == "parameter_list")
-		parserParameterList(declarator->left->right->right, funcName,true);
-
-	//此时函数池中的func已经添加了参数列表
-	funcNode func = funcPool[funcName];
-	//如果函数事先声明过，则比较函数的参数列表和返回类型
-	if (isdeclared) {
-		if (func.rtype != declarFunc.rtype) {
-			printError(type_specifier->left->line, "Function return type doesn't equal to the function declared before.");
-		}
-		cout << funBlock.func.paralist.size() << endl;
-		if (func.paralist.size() != declarFunc.paralist.size()) {
-			printError(declarator->left->right->right->line, "The number of function parameters doesn't equal to the function declared before.");
-		}
-		for (int i = 0; i < funBlock.func.paralist.size(); i++) {
-			if (func.paralist[i].type != declarFunc.paralist[i].type)
-				printError(declarator->left->right->right->line, "The parameter " + funBlock.func.paralist[i].name + "'s type doesn't equal to the function declared before." );
-		}
-	}
-	//更新Block中func的参数列表
-	funBlock.func = func;
-	//分析函数的正文
-	parserCompoundStatement(compound_statement);
-
-	//函数结束后，弹出相应的block
-	recordStack.pop_back();
-
-	return node->right;
-}
 
 //获取函数形参列表，函数定义需要获取形参，声明则不需要
 void Parser::parserParameterList(TreePtr node,string funcName,bool definite) {
@@ -642,8 +799,8 @@ void Parser::parserParameterList(TreePtr node,string funcName,bool definite) {
 //获取单个形参内容,函数定义需要获取形参，声明则不需要
 void Parser::parserParameterDeclaration(TreePtr node, string funcName,bool definite) {
 	//cout << "parserParameterDeclaration" << endl;
-	Tree* type_specifier = node->left;
-	Tree* declarator = node->left->right;
+	TreePtr type_specifier = node->left;
+	TreePtr declarator = node->left->right;
 	string typeName = type_specifier->left->content;
 	if (typeName == "void") {
 		printError(type_specifier->line, "Void can't definite parameter.");
@@ -669,182 +826,7 @@ void Parser::parserParameterDeclaration(TreePtr node, string funcName,bool defin
 }
 
 
-TreePtr Parser::parserDeclaration(TreePtr node) {
-	//cout << "at " << node->name << endl;
-	//node = declaration
-	TreePtr begin = node->left;	//begin:type_specifier
-	if (begin->right->name == ";")
-		return node->right;
-	
-	string vartype = begin->left->content;
 
-	if (vartype == "void") {
-		printError(begin->left->line,"void type can't assign to variable");	//报错
- 	}
-	TreePtr decl = begin->right;	//init_declarator_list
-
-
-	/*while (decl->right) {
-		parserInitDeclarator(vartype, decl->right->right);
-		decl = decl->left;
-	}
-	parserInitDeclarator(vartype, decl);*/
-	parserInitDeclaratorList(vartype, decl);
-	return node->right;
-
-}
-
-void Parser::parserInitDeclaratorList(string vartype, TreePtr node) {
-	if (node->left->name == "init_declarator_list") {
-		parserInitDeclaratorList(vartype, node->left);
-	}
-	else if (node->left->name == "init_declarator") {
-		parserInitDeclarator(vartype, node->left);
-	}
-
-	if (node->right->name == ",") {
-		parserInitDeclarator(vartype, node->right->right);
-	}
-}
-
-
-//分析变量初始化
-void Parser::parserInitDeclarator(string vartype, TreePtr node) {
-	//cout << "at " << node->name << endl;
-	TreePtr declarator = node->left;
-
-	if (!declarator->right) {
-		//获取变量的名字
-		if (declarator->left->name == "IDENTIFIER") {
-			TreePtr id = declarator->left;
-			string var = id->content;
-			if (!lookupCurruntVar(var)) {
-				varNode newvar;
-				newvar.name = var;
-				newvar.type = vartype;
-				newvar.num = innerCode.varNum++;
-				recordStack.back().varMap.insert({ var,newvar });
-			}
-			else printError(declarator->left->line, "Variable multiple declaration.");
-		}
-		else {
-			//函数声明
-			if (declarator->left->right->name == "(") {
-				string funcName = declarator->left->left->content;
-				string funcType = vartype;
-				if (recordStack.size() > 1) {
-					printError(declarator->left->right->line, "Functinon declaration must at global environment.");
-				}
-				Tree* parameter_list = declarator->left->right->right;
-				funcNode newFunc;
-				newFunc.isdefinied = false;
-				newFunc.name = funcName;
-				newFunc.rtype = funcType;
-				funcPool.insert({ funcName,newFunc });
-				//分析函数形参列表
-				parserParameterList(parameter_list,funcName,false);
-			}
-			//数组声明
-			else if (declarator->left->right->name == "[") {
-				string arrayName = declarator->left->left->content;
-				string arrayType = vartype;
-				Tree* assign_exp = declarator->left->right->right;
-				varNode rnode = parserAssignmentExpression(assign_exp);
-
-				if (rnode.type != "int") {
-					printError(declarator->left->right->line,"Array size must be int.");
-				}
-				
-
-				varNode tnode;
-				if (arrayType == "int") {
-					//创建一个新的临时变量来储存数组的大小
-					string tempname = "temp" + inttostr(innerCode.tempNum);
-					++innerCode.tempNum;
-					tnode = createVar(tempname, "int");
-
-					recordStack.back().varMap.insert({ tempname,tnode });
-
-					varNode tempVar3;
-					string tempName3 = "temp" + inttostr(innerCode.tempNum);
-					++innerCode.tempNum;
-					tempVar3.name = tempName3;
-					tempVar3.type = "int";
-					recordStack.back().varMap.insert({ tempName3,tempVar3 });
-
-					innerCode.addCode(tempName3 + " := #4");
-
-					innerCode.addCode(tnode.name + " := " + tempName3 +" * " + rnode.name);
-				}
-				else if (arrayType == "double") {
-					//创建一个新的临时变量来储存数组的大小
-					string tempname = "temp" + inttostr(innerCode.tempNum);
-					++innerCode.tempNum;
-					tnode = createVar(tempname, "int");
-
-					recordStack.back().varMap.insert({ tempname,tnode });
-					
-					varNode tempVar3;
-					string tempName3 = "temp" + inttostr(innerCode.tempNum);
-					++innerCode.tempNum;
-					tempVar3.name = tempName3;
-					tempVar3.type = "int";
-					recordStack.back().varMap.insert({ tempName3,tempVar3 });
-
-					innerCode.addCode(tempName3 + " := #8");
-
-					innerCode.addCode(tnode.name + " := " + tempName3 + " * " + rnode.name);
-				}
-				else if (arrayType == "bool") {
-					tnode = rnode;
-				}
-				
-
-				arrayNode anode;
-				anode.name = arrayName;
-				anode.type = arrayType;
-				anode.num = innerCode.arrayNum++;
-				innerCode.addCode("DEC " + innerCode.getarrayNodeName(anode) + " " + tnode.name);
-
-				recordStack.back().arrayMap.insert({ arrayName,anode });
-			}
-		}
-	}
-	//有初始化
-	else if (declarator->right->name == "=") {	
-		//获取变量的名字
-		varNode newvar;
-		if (declarator->left->name == "IDENTIFIER") {
-			TreePtr id = declarator->left;
-			string var = id->content;
-			if (!lookupCurruntVar(var)) {
-				newvar.name = var;
-				newvar.type = vartype;
-				newvar.num = innerCode.varNum++;
-				recordStack.back().varMap.insert({ var,newvar });
-			}
-			else printError(declarator->left->line, "Variable multiple declaration.");
-		}
-		else printError(declarator->left->line, "It's not a variable!");
-
-
-		Tree* initializer = declarator->right->right;
-		if (initializer == NULL) {
-			printError(declarator->line, "Lack the initializer for variable.");
-		}
-		else {
-			if (initializer->left->name == "assignment_expression") {
-				varNode rnode = parserAssignmentExpression(initializer->left);
-				innerCode.addCode(innerCode.createCodeforAssign(newvar,rnode));
-				string rtype = rnode.type;
-				if (rtype != vartype)
-					printError(initializer->left->line, "Wrong type to variable " + declarator->left->content + ": " + 
-					rtype + " to " + vartype);
-			}
-		}
-	}
-	else printError(declarator->right->line, "Wrong value to variable");
-}
 
 varNode Parser::parserAssignmentExpression(TreePtr assign_exp) {	//返回变量节点
 
@@ -975,7 +957,7 @@ varNode Parser::parserLogicalOrExpression(TreePtr logical_or_exp) {
 varNode Parser::parserLogicalAndExpression(TreePtr logical_and_exp) {
 	
 	if (logical_and_exp->left->name == "inclusive_or_expression") {
-		Tree* inclusive_or_exp = logical_and_exp->left;
+		TreePtr inclusive_or_exp = logical_and_exp->left;
 		return parserInclusiveOrExpression(inclusive_or_exp);
 	}
 	else if (logical_and_exp->left->name == "logical_and_expression") {
@@ -1003,7 +985,7 @@ varNode Parser::parserLogicalAndExpression(TreePtr logical_and_exp) {
 varNode Parser::parserInclusiveOrExpression(TreePtr inclusive_or_exp) {
 	
 	if (inclusive_or_exp->left->name == "exclusive_or_expression") {
-		Tree* exclusive_or_exp = inclusive_or_exp->left;
+		TreePtr exclusive_or_exp = inclusive_or_exp->left;
 		return parserExclusiveOrExpression(exclusive_or_exp);
 	}
 	else if (inclusive_or_exp->left->name == "inclusive_or_expression") {
@@ -1026,7 +1008,7 @@ varNode Parser::parserInclusiveOrExpression(TreePtr inclusive_or_exp) {
 varNode Parser::parserExclusiveOrExpression(TreePtr exclusive_or_exp) {
 	
 	if (exclusive_or_exp->left->name == "and_expression") {
-		Tree* and_exp = exclusive_or_exp->left;
+		TreePtr and_exp = exclusive_or_exp->left;
 		return parserAndExpression(and_exp);
 	}
 	else if (exclusive_or_exp->left->name == "exclusive_or_expression") {
@@ -1048,7 +1030,7 @@ varNode Parser::parserExclusiveOrExpression(TreePtr exclusive_or_exp) {
 
 varNode Parser::parserAndExpression(TreePtr and_exp) {
 	if (and_exp->left->name == "equality_expression") {
-		Tree* equality_exp = and_exp->left;
+		TreePtr equality_exp = and_exp->left;
 		return parserEqualityExpression(equality_exp);
 	}
 	else if (and_exp->left->name == "and_expression") {
@@ -1073,7 +1055,7 @@ varNode Parser::parserAndExpression(TreePtr and_exp) {
 varNode Parser::parserEqualityExpression(TreePtr equality_exp) {
 	
 	if (equality_exp->left->name == "relational_expression") {
-		Tree* relational_exp = equality_exp->left;
+		TreePtr relational_exp = equality_exp->left;
 		return parserRelationalExpression(relational_exp);
 	}
 	else if (equality_exp->left->right->name == "EQ_OP" || equality_exp->left->right->name == "NE_OP") {
@@ -1104,7 +1086,7 @@ varNode Parser::parserEqualityExpression(TreePtr equality_exp) {
 
 varNode Parser::parserRelationalExpression(TreePtr relational_exp) {
 	if (relational_exp->left->name == "shift_expression") {
-		Tree* shift_exp = relational_exp->left;
+		TreePtr shift_exp = relational_exp->left;
 		return parserShiftExpression(shift_exp);
 	}
 	else {
@@ -1137,7 +1119,7 @@ varNode Parser::parserRelationalExpression(TreePtr relational_exp) {
 
 varNode Parser::parserShiftExpression(TreePtr shift_exp) {
 	if (shift_exp->left->name == "additive_expression") {
-		Tree* additive_exp = shift_exp->left;
+		TreePtr additive_exp = shift_exp->left;
 		return parserAdditiveExpression(additive_exp);
 	}
 	else if (shift_exp->left->right->name == "LEFT_OP" || shift_exp->left->right->name == "RIGHT_OP") {
@@ -1168,7 +1150,7 @@ varNode Parser::parserShiftExpression(TreePtr shift_exp) {
 
 varNode Parser::parserAdditiveExpression(TreePtr additive_exp) {
 	if (additive_exp->left->name == "multiplicative_expression") {
-		Tree* mult_exp = additive_exp->left;
+		TreePtr mult_exp = additive_exp->left;
 		return parserMultiplicativeExpression(mult_exp);
 	}
 	else if (additive_exp->left->right->name == "+" || additive_exp->left->right->name == "-") {
@@ -1192,7 +1174,7 @@ varNode Parser::parserAdditiveExpression(TreePtr additive_exp) {
 varNode Parser::parserMultiplicativeExpression(TreePtr mult_exp) {
 
 	if (mult_exp->left->name == "unary_expression") {
-		Tree* unary_exp = mult_exp->left;
+		TreePtr unary_exp = mult_exp->left;
 		return parserUnaryExpression(unary_exp);
 	}
 	else if (mult_exp->left->right->name == "*" || mult_exp->left->right->name == "/" || 
@@ -1217,7 +1199,7 @@ varNode Parser::parserMultiplicativeExpression(TreePtr mult_exp) {
 
 varNode Parser::parserUnaryExpression(TreePtr unary_exp) {
 	if (unary_exp->left->name == "postfix_expression") {
-		Tree* post_exp = unary_exp->left;
+		TreePtr post_exp = unary_exp->left;
 		return parserPostfixExpression(post_exp);
 	}
 	else if (unary_exp->left->name == "INC_OP") {
@@ -1312,13 +1294,13 @@ varNode Parser::parserUnaryExpression(TreePtr unary_exp) {
 varNode Parser::parserPostfixExpression(TreePtr post_exp) {
 	//cout << "here" << endl;
 	if (post_exp->left->name == "primary_expression") {
-		Tree* primary_exp = post_exp->left;
+		TreePtr primary_exp = post_exp->left;
 		return parserPrimaryExpression(primary_exp);
 	}
 	else if (post_exp->left->right->name == "[") {
 		//数组调用
 		string arrayName = post_exp->left->left->left->content;
-		Tree* expression = post_exp->left->right->right;
+		TreePtr expression = post_exp->left->right->right;
 		varNode enode = parserExpression(expression);
 		arrayNode anode = getArrayNode(arrayName);
 
@@ -1385,7 +1367,7 @@ varNode Parser::parserPostfixExpression(TreePtr post_exp) {
 		}
 
 		if (post_exp->left->right->right->name == "argument_expression_list") {
-			Tree* argument_exp_list = post_exp->left->right->right;
+			TreePtr argument_exp_list = post_exp->left->right->right;
 			parserArgumentExpressionList(argument_exp_list, funcName);
 			//cout << "funcCall" << endl;
 
@@ -1393,14 +1375,14 @@ varNode Parser::parserPostfixExpression(TreePtr post_exp) {
 
 		funcNode func = funcPool[funcName];
 		
-		if (func.rtype == "void") {
+		if (func.returnType == "void") {
 			innerCode.addCode("CALL " + funcName);
 		}
 		else {
 			string tempname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
 
-			newNode = createVar(tempname, funcPool[funcName].rtype);
+			newNode = createVar(tempname, funcPool[funcName].returnType);
 			innerCode.addCode(tempname + " := CALL " + funcName);
 
 		}
@@ -1472,7 +1454,7 @@ varNode Parser::parserPostfixExpression(TreePtr post_exp) {
 }
 
 void Parser::parserArgumentExpressionList(TreePtr node, string funcName) {
-	Tree* argu_exp_list = node->left;
+	TreePtr argu_exp_list = node->left;
 	funcNode func = funcPool[funcName];
 	int i = 0;
 	while (argu_exp_list->name == "argument_expression_list") {
@@ -1500,7 +1482,7 @@ void Parser::parserArgumentExpressionList(TreePtr node, string funcName) {
 varNode Parser::parserPrimaryExpression(TreePtr primary_exp) {
 	if (primary_exp->left->name == "IDENTIFIER") {
 		string content = primary_exp->left->content;
-		varNode rnode = lookupNode(content);
+		varNode rnode = findNode(content);
 		if (rnode.num < 0) {
 			printError(primary_exp->left->line, "Undefined variable " + content);
 		}
@@ -1548,22 +1530,20 @@ varNode Parser::parserPrimaryExpression(TreePtr primary_exp) {
 
 
 //全局查找
-string Parser::lookupVar(string name) {
-	int N = recordStack.size();
-	for (int i = N - 1; i >= 0; i--) {
+string Parser::findVar(string name) {
+	for (int i = recordStack.size() - 1; i >= 0; i--) {
 		if (recordStack[i].varMap.find(name) != recordStack[i].varMap.end())
 			return recordStack[i].varMap[name].type;
 	}
 	return "";
 }
 //当前块查找
-bool Parser::lookupCurruntVar(string name) {
+bool Parser::findCurruntVar(string name) {
 	return recordStack.back().varMap.find(name) != recordStack.back().varMap.end();
 }
 
-struct varNode Parser::lookupNode(string name) {
-	int N = recordStack.size();
-	for (int i = N - 1; i >= 0; i--) {
+struct varNode Parser::findNode(string name) {
+	for (int i = recordStack.size() - 1; i >= 0; i--) {
 		if (recordStack[i].varMap.find(name) != recordStack[i].varMap.end())
 			return recordStack[i].varMap[name];
 	}
@@ -1572,18 +1552,16 @@ struct varNode Parser::lookupNode(string name) {
 	return temp;
 }
 
-string Parser::getFuncRType() {
-	int N = recordStack.size();
-	for (int i = N - 1; i >= 0; i--) {
+string Parser::getReturnType() {
+	for (int i = recordStack.size()- 1; i >= 0; i--) {
 		if (recordStack[i].isfunc)
-			return recordStack[i].func.rtype;
+			return recordStack[i].func.returnType;
 	}
 	return "";
 }
 
 string Parser::getArrayType(string name) {
-	int N = recordStack.size();
-	for (int i = N - 1; i >= 0; i--) {
+	for (int i = recordStack.size() - 1; i >= 0; i--) {
 		if (recordStack[i].arrayMap.find(name) != recordStack[i].arrayMap.end())
 			return recordStack[i].arrayMap[name].type;
 	}
@@ -1591,8 +1569,7 @@ string Parser::getArrayType(string name) {
 }
 
 struct arrayNode Parser::getArrayNode(string name) {
-	int N = recordStack.size();
-	for (int i = N - 1; i >= 0; i--) {
+	for (int i = recordStack.size() - 1; i >= 0; i--) {
 		if (recordStack[i].arrayMap.find(name) != recordStack[i].arrayMap.end())
 			return recordStack[i].arrayMap[name];
 	}
@@ -1602,8 +1579,7 @@ struct arrayNode Parser::getArrayNode(string name) {
 }
 
 int Parser::getBreakRecordNumber() {
-	int N = recordStack.size();
-	for (int i = N - 1; i >= 0; i--) {
+	for (int i = recordStack.size() - 1; i >= 0; i--) {
 		if (recordStack[i].canBreak)
 			return i;
 	}
@@ -1612,7 +1588,7 @@ int Parser::getBreakRecordNumber() {
 
 void Parser::printError(int line, string error) {
 
-	print_code();
+	innerCode.printCode();
 
 	cout << "Error! line " << line << ": ";
 	cout << error << endl;
@@ -1635,9 +1611,5 @@ void Parser::print_map() {
 			cout << "     " << it->first << " " << it->second.type << endl;
 		}
 	}
-}
-
-void Parser::print_code() {
-	innerCode.printCode();
 }
 

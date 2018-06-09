@@ -112,6 +112,10 @@
     <ClInclude Include="tools.h" />
     <ClInclude Include="tree.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="compiler.l" />
+    <None Include="compiler.y" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

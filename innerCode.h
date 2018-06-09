@@ -24,7 +24,7 @@ public:
 	void addCode(string);
 	void printCode();
 	string createCodeforVar(string tempname, string op, varNode node1, varNode node2);
-	string createCodeforAssign(varNode node1,varNode node2);
+	string createCodeforAssign(varNode node1, varNode node2);
 	string createCodeforParameter(varNode node);
 	string createCodeforReturn(varNode node);
 	string createCodeforArgument(varNode node);

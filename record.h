@@ -23,7 +23,7 @@ struct varNode {
 struct funcNode {
 	bool isdefinied = false;
 	string name;				//函数名
-	string rtype;				//函数返回类型
+	string returnType;				//函数返回类型
 	vector<varNode> paralist;	//记录形参列表
 };
 
@@ -42,7 +42,7 @@ public:
 	bool isfunc = false;//记录是否是函数
 	map<string, struct varNode> varMap;		//变量的map
 	map<string, struct arrayNode> arrayMap;	//数组的map
-	string breakLabelname;
+	string breakLabel;
 	bool canBreak = false;
 };
 

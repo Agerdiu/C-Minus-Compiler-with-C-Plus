@@ -19,14 +19,12 @@ private:
 	map<string, funcNode> funcPool;			//函数池
 	vector<Record> recordStack;				//维护的栈
 	InnerCode innerCode;					//中间代码生成工具
-	//set<string> build_in_function;
 
 	TreePtr root;
 
 	void Init();
 	void parseTree(TreePtr node);
 
-	
 	TreePtr parserDeclaration(TreePtr node);		//分析parserDeclaration的节点
 	void parserInitDeclaratorList(string, TreePtr);
 	void parserInitDeclarator(string, TreePtr );			//分析parserInitDeclarator的节点
@@ -38,15 +36,13 @@ private:
 	TreePtr parserStatement(TreePtr);
 
 	void parserExpressionStatement(TreePtr);
-	varNode parserExpression(TreePtr);
-
 	void parserArgumentExpressionList(TreePtr,string);
-
 	void parserJumpStatement(TreePtr);
 	void parserCompoundStatement(TreePtr);
 	void parserSelectionStatement(TreePtr);
 	void parserIterationStatement(TreePtr);
 
+	varNode parserExpression(TreePtr);
 	varNode parserAssignmentExpression(TreePtr);			//赋值表达式
 	varNode parserLogicalOrExpression(TreePtr);			//逻辑或表达式
 	varNode parserLogicalAndExpression(TreePtr);		//逻辑或表达式
@@ -63,10 +59,10 @@ private:
 	varNode parserPrimaryExpression(TreePtr);
 
 
-	string lookupVar(string name);			//返回变量类型，找不到返回""
-	bool lookupCurruntVar(string name);		//查找当前块的var
-	struct varNode lookupNode(string name);	//返回变量节点
-	string getFuncRType();
+	string findVar(string name);			//返回变量类型，找不到返回""
+	bool findCurruntVar(string name);		//查找当前块的var
+	struct varNode findNode(string name);	//返回变量节点
+	string getReturnType();
 	string getArrayType(string name);
 	struct arrayNode getArrayNode(string name);
 
