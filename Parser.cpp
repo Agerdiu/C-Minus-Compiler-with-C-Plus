@@ -4,7 +4,7 @@
 #include<map>
 using namespace std;
 
-Parser::Parser(Tree* root) {
+Parser::Parser(TreePtr root) {
 	this->root = root;
 	Init();
 }
@@ -35,18 +35,18 @@ void Parser::Init() {
 	parseTree(root);		//开始分析语法树
 }
 
-void Parser::parseTree(struct Tree* node) {
+void Parser::parseTree(TreePtr node) {
 	if (node == NULL || node->line == -1)
 		return;
 
 	if (node->name == "declaration") {
-		node = parser_declaration(node);
+		node = parserDeclaration(node);
 	}
 	else if (node->name == "function_definition") {
-		node = parser_function_definition(node);
+		node = parserFunctionDefinition(node);
 	}
 	else if (node->name == "statement") {
-		node = parser_statement(node);
+		node = parserStatement(node);
 	}
 
 	//继续向下分析
@@ -56,88 +56,82 @@ void Parser::parseTree(struct Tree* node) {
 	}
 }
 
-struct Tree* Parser::parser_statement(struct Tree* node) {
-	struct Tree* next = node->left;
+TreePtr Parser::parserStatement(TreePtr node) {
+	TreePtr next = node->left;
 	if (node->left->name == "labeled_statement") {
 
 	}
 	if (node->left->name == "compound_statement") {
-		parser_compound_statement(node->left);
+		parserCompoundStatement(node->left);
 	}
 	if (node->left->name == "expression_statement") {
-		parser_expression_statement(node->left);
+		parserExpressionStatement(node->left);
 	}
 	if (node->left->name == "selection_statement") {
-		parser_selection_statement(node->left);
+		parserSelectionStatement(node->left);
 	}
 	if (node->left->name == "iteration_statement") {
-		parser_iteration_statement(node->left);
+		parserIterationStatement(node->left);
 	}
 	if (node->left->name == "jump_statement") {
-		parser_jump_statement(node->left);
+		parserJumpStatement(node->left);
 	}
 
 	return node->right;
 }
 
-void Parser::parser_jump_statement(struct Tree* node) {
-	if (node->left->name == "JUMP") {
-
-	}
-	else if (node->left->name == "CONTINUE") {
-
-	}
-	else if (node->left->name == "BREAK") {
-		int num = getBreakRecordNumber();
-		if (num < 0) {
-			error(node->left->line, "This scope doesn't support break.");
+void Parser::parserJumpStatement(TreePtr node) {
+	if (node->left->name == "BREAK") {
+		int recordNum = getBreakRecordNumber();
+		if (recordNum < 0) {
+			printError(node->left->line, "This scope doesn't support break.");
 		}
 	
-		innerCode.addCode("JUMP " + recordStack[num].breakLabelname);
+		innerCode.addCode("GOTO " + recordStack[recordNum].breakLabel);
 	}
 	else if (node->left->name == "RETURN") {
 		string funcType = getFuncRType();
 		if (node->left->right->name == "expression") {//return expression
-			varNode rnode = parser_expression(node->left->right);
+			varNode rnode = parserExpression(node->left->right);
 			innerCode.addCode(innerCode.createCodeforReturn(rnode));
 			if (rnode.type != funcType) {
-				error(node->left->right->line, "return type doesn't equal to function return type.");
+				printError(node->left->right->line, "return type doesn't equal to function return type.");
 			}
 		}
 		else if (node->left->right->name == ";"){//return ;
 			innerCode.addCode("RETURN");
 			if (funcType != "void") {
-				error(node->left->right->line, "You should return " + recordStack.back().func.rtype);
+				printError(node->left->right->line, "You should return " + recordStack.back().func.rtype);
 			}
 		}
 	}
 }
 
-void Parser::parser_expression_statement(struct Tree *node) {
+void Parser::parserExpressionStatement(TreePtr node) {
 	if (node->left->name == "expression") {
-		parser_expression(node->left);
+		parserExpression(node->left);
 	}
 }
 
-varNode Parser::parser_expression(struct Tree* node) {
+varNode Parser::parserExpression(TreePtr node) {
 	if (node->left->name == "expression") {
-		return parser_expression(node->left);
+		return parserExpression(node->left);
 	}
 	else if (node->left->name == "assignment_expression") {
-		return parser_assignment_expression(node->left);
+		return parserAssignmentExpression(node->left);
 	}
 	if (node->right->name == ",") {
-		return parser_assignment_expression(node->right->right);
+		return parserAssignmentExpression(node->right->right);
 	}
 }
 
-void Parser::parser_compound_statement(struct Tree* node) {
+void Parser::parserCompoundStatement(TreePtr node) {
 	//继续分析处理compound_statement
 	parseTree(node);
 }
 
 //if else
-void Parser::parser_selection_statement(struct Tree* node) {
+void Parser::parserSelectionStatement(TreePtr node) {
 
 
 	if (node->left->name == "IF") {
@@ -147,29 +141,29 @@ void Parser::parser_selection_statement(struct Tree* node) {
 			recordStack.push_back(newrecord);
 
 			Tree* expression = node->left->right->right;
-			varNode exp_rnode = parser_expression(expression);
+			varNode exp_rnode = parserExpression(expression);
 			Tree* statement = node->left->right->right->right->right;
 
 			string label1 = innerCode.getLabelName();
 			string label2 = innerCode.getLabelName();
 
 			if (exp_rnode.type == "bool") {
-				innerCode.addCode("IF " + exp_rnode.boolString + " JUMP " + label1);
+				innerCode.addCode("IF " + exp_rnode.boolString + " GOTO " + label1);
 			}
 			else {
 				string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 				++innerCode.tempNum;
-				varNode newznode = createTempVar(tempzeroname, "int");
+				varNode newznode = createVar(tempzeroname, "int");
 				innerCode.addCode(tempzeroname + " := #0");
 
-				innerCode.addCode("IF " + innerCode.getNodeName(exp_rnode) + " != " + tempzeroname + " JUMP " + label1);
+				innerCode.addCode("IF " + innerCode.getNodeName(exp_rnode) + " != " + tempzeroname + " GOTO " + label1);
 			}
 			
-			innerCode.addCode("JUMP " + label2);
+			innerCode.addCode("GOTO " + label2);
 			innerCode.addCode("LABEL " + label1 + " :");
 
 
-			parser_statement(statement);
+			parserStatement(statement);
 			
 			innerCode.addCode("LABEL " + label2 + " :");
 
@@ -183,7 +177,7 @@ void Parser::parser_selection_statement(struct Tree* node) {
 			recordStack.push_back(newrecord1);
 
 			Tree* expression = node->left->right->right;
-			varNode exp_rnode = parser_expression(expression);
+			varNode exp_rnode = parserExpression(expression);
 			Tree* statement1 = node->left->right->right->right->right;
 			Tree* statement2 = node->left->right->right->right->right->right->right;
 
@@ -192,23 +186,23 @@ void Parser::parser_selection_statement(struct Tree* node) {
 			string label3 = innerCode.getLabelName();
 
 			if (exp_rnode.type == "bool") {
-				innerCode.addCode("IF " + exp_rnode.boolString + " JUMP " + label1);
+				innerCode.addCode("IF " + exp_rnode.boolString + " GOTO " + label1);
 			}
 			else {
 				string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 				++innerCode.tempNum;
-				varNode newznode = createTempVar(tempzeroname, "int");
+				varNode newznode = createVar(tempzeroname, "int");
 				innerCode.addCode(tempzeroname + " := #0");
 
-				innerCode.addCode("IF " + innerCode.getNodeName(exp_rnode) + " != " + tempzeroname + " JUMP " + label1);
+				innerCode.addCode("IF " + innerCode.getNodeName(exp_rnode) + " != " + tempzeroname + " GOTO " + label1);
 			}
 
-			innerCode.addCode("JUMP " + label2);
+			innerCode.addCode("GOTO " + label2);
 			innerCode.addCode("LABEL " + label1 + " :");
 
-			parser_statement(statement1);
+			parserStatement(statement1);
 			
-			innerCode.addCode("JUMP " + label3);
+			innerCode.addCode("GOTO " + label3);
 			//弹出添加的block
 			recordStack.pop_back();
 
@@ -218,7 +212,7 @@ void Parser::parser_selection_statement(struct Tree* node) {
 			Record newrecord2;
 			recordStack.push_back(newrecord2);
 
-			parser_statement(statement2);
+			parserStatement(statement2);
 
 			innerCode.addCode("LABEL " + label3 + " :");
 
@@ -234,7 +228,7 @@ void Parser::parser_selection_statement(struct Tree* node) {
 }
 
 //循环 while for do while
-void Parser::parser_iteration_statement(struct Tree* node) {
+void Parser::parserIterationStatement(TreePtr node) {
 	if (node->left->name == "WHILE") {
 
 		//添加一个新的block
@@ -242,36 +236,36 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 		newrecord.canBreak = true;
 		recordStack.push_back(newrecord);
 
-		struct Tree* expression = node->left->right->right;
-		struct Tree* statement = node->left->right->right->right->right;
+		TreePtr expression = node->left->right->right;
+		TreePtr statement = node->left->right->right->right->right;
 
 		string label1 = innerCode.getLabelName();
 		string label2 = innerCode.getLabelName();
 		string label3 = innerCode.getLabelName();
 
-		recordStack.back().breakLabelname = label3;
+		recordStack.back().breakLabel = label3;
 
 		innerCode.addCode("LABEL " + label1 + " :");
 
-		varNode var = parser_expression(expression);
+		varNode var = parserExpression(expression);
 
 		if (var.type == "bool") {  
-			innerCode.addCode("IF " + var.boolString + " JUMP " + label2);
+			innerCode.addCode("IF " + var.boolString + " GOTO " + label2);
 		}
 		else {
 			string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
-			varNode newznode = createTempVar(tempzeroname, "int");
+			varNode newznode = createVar(tempzeroname, "int");
 			innerCode.addCode(tempzeroname + " := #0");
 
-			innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " JUMP " + label2);
+			innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " GOTO " + label2);
 		}
-		innerCode.addCode("JUMP " + label3);
+		innerCode.addCode("GOTO " + label3);
 		innerCode.addCode("LABEL " + label2 + " :");
 
-		parser_statement(statement);
+		parserStatement(statement);
 
-		innerCode.addCode("JUMP " + label1);
+		innerCode.addCode("GOTO " + label1);
 		innerCode.addCode("LABEL " + label3 + " :");
 		
 
@@ -284,33 +278,33 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 		newrecord.canBreak = true;
 		recordStack.push_back(newrecord);
 
-		struct Tree* statement = node->left->right;
-		struct Tree* expression = node->left->right->right->right->right;
+		TreePtr statement = node->left->right;
+		TreePtr expression = node->left->right->right->right->right;
 
 		string label1 = innerCode.getLabelName();
 		string label2 = innerCode.getLabelName();
 
-		recordStack.back().breakLabelname = label2;
+		recordStack.back().breakLabel = label2;
 
 		innerCode.addCode("LABEL " + label1 + " :");
 
-		parser_statement(statement);
+		parserStatement(statement);
 
-		varNode var = parser_expression(expression);
+		varNode var = parserExpression(expression);
 
 		if (var.type == "bool") {
-			innerCode.addCode("IF " + var.boolString + " JUMP " + label1);
+			innerCode.addCode("IF " + var.boolString + " GOTO " + label1);
 		}
 		else {
 			string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
-			varNode newznode = createTempVar(tempzeroname, "int");
+			varNode newznode = createVar(tempzeroname, "int");
 			innerCode.addCode(tempzeroname + " := #0");
 
-			innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " JUMP " + label1);
+			innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " GOTO " + label1);
 		}
 
-		/*innerCode.addCode("JUMP " + label1);*/
+		/*innerCode.addCode("GOTO " + label1);*/
 		innerCode.addCode("LABEL " + label2 + " :");
 
 		//弹出添加的block
@@ -334,38 +328,38 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 				string label2 = innerCode.getLabelName();
 				string label3 = innerCode.getLabelName();
 
-				recordStack.back().breakLabelname = label3;
+				recordStack.back().breakLabel = label3;
 
 				if (exp_state1->left->name == "expression") {
-					parser_expression(exp_state1->left);
+					parserExpression(exp_state1->left);
 				}
 				innerCode.addCode("LABEL " + label1 + " :");
 
 				varNode var;
 				if (exp_state2->left->name == "expression") {
-					var = parser_expression(exp_state2->left);
+					var = parserExpression(exp_state2->left);
 					if (var.type == "bool") {
-						innerCode.addCode("IF " + var.boolString + " JUMP " + label2);
+						innerCode.addCode("IF " + var.boolString + " GOTO " + label2);
 					}
 					else {
 						string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 						++innerCode.tempNum;
-						varNode newznode = createTempVar(tempzeroname, "int");
+						varNode newznode = createVar(tempzeroname, "int");
 						innerCode.addCode(tempzeroname + " := #0");
 
-						innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " JUMP " + label2);
+						innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " GOTO " + label2);
 					}
 				}
 				else {
-					innerCode.addCode("JUMP " + label2);
+					innerCode.addCode("GOTO " + label2);
 				}
 
-				innerCode.addCode("JUMP " + label3);
+				innerCode.addCode("GOTO " + label3);
 				innerCode.addCode("LABEL " + label2 + " :");
 
-				parser_statement(statement);
+				parserStatement(statement);
 
-				innerCode.addCode("JUMP " + label1);
+				innerCode.addCode("GOTO " + label1);
 				innerCode.addCode("LABEL " + label3 + " :");
 
 				////如果需要break
@@ -392,41 +386,41 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 				string label2 = innerCode.getLabelName();
 				string label3 = innerCode.getLabelName();
 
-				recordStack.back().breakLabelname = label3;
+				recordStack.back().breakLabel = label3;
 
 				if (exp_state1->left->name == "expression") {
-					parser_expression(exp_state1->left);
+					parserExpression(exp_state1->left);
 				}
 				innerCode.addCode("LABEL " + label1 + " :");
 
 				varNode var;
 				if (exp_state2->left->name == "expression") {
-					var = parser_expression(exp_state2->left);
+					var = parserExpression(exp_state2->left);
 
 					if (var.type == "bool") {
-						innerCode.addCode("IF " + var.boolString + " JUMP " + label2);
+						innerCode.addCode("IF " + var.boolString + " GOTO " + label2);
 					}
 					else {
 						string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 						++innerCode.tempNum;
-						varNode newznode = createTempVar(tempzeroname, "int");
+						varNode newznode = createVar(tempzeroname, "int");
 						innerCode.addCode(tempzeroname + " := #0");
 
-						innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " JUMP " + label2);
+						innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " GOTO " + label2);
 					}
 				}
 				else {
-					innerCode.addCode("JUMP " + label2);
+					innerCode.addCode("GOTO " + label2);
 				}
 
-				innerCode.addCode("JUMP " + label3);
+				innerCode.addCode("GOTO " + label3);
 				innerCode.addCode("LABEL " + label2 + " :");
 
-				parser_statement(statement);
+				parserStatement(statement);
 
-				parser_expression(exp);
+				parserExpression(exp);
 
-				innerCode.addCode("JUMP " + label1);
+				innerCode.addCode("GOTO " + label1);
 				innerCode.addCode("LABEL " + label3 + " :");
 
 				////如果需要break
@@ -454,38 +448,38 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 				string label2 = innerCode.getLabelName();
 				string label3 = innerCode.getLabelName();
 
-				recordStack.back().breakLabelname = label3;
+				recordStack.back().breakLabel = label3;
 
-				parser_declaration(declaration);
+				parserDeclaration(declaration);
 				innerCode.addCode("LABEL " + label1 + " :");
 
 				varNode var;
 				if (expression_statement->left->name == "expression") {
 
-					var = parser_expression(expression_statement->left);
+					var = parserExpression(expression_statement->left);
 
 					if (var.type == "bool") {
-						innerCode.addCode("IF " + var.boolString + " JUMP " + label2);
+						innerCode.addCode("IF " + var.boolString + " GOTO " + label2);
 					}
 					else {
 						string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 						++innerCode.tempNum;
-						varNode newznode = createTempVar(tempzeroname, "int");
+						varNode newznode = createVar(tempzeroname, "int");
 						innerCode.addCode(tempzeroname + " := #0");
 
-						innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " JUMP " + label2);
+						innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " GOTO " + label2);
 					}
 				}
 				else {
-					innerCode.addCode("JUMP " + label2);
+					innerCode.addCode("GOTO " + label2);
 				}
-				innerCode.addCode("JUMP " + label3);
+				innerCode.addCode("GOTO " + label3);
 				innerCode.addCode("LABEL " + label2 + " :");
 
-				parser_statement(statement);
+				parserStatement(statement);
 
 				//cout << "here" << endl;
-				innerCode.addCode("JUMP " + label1);
+				innerCode.addCode("GOTO " + label1);
 				innerCode.addCode("LABEL " + label3 + " :");
 
 				////如果需要break
@@ -513,38 +507,38 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 				string label2 = innerCode.getLabelName();
 				string label3 = innerCode.getLabelName();
 
-				recordStack.back().breakLabelname = label3;
+				recordStack.back().breakLabel = label3;
 
-				parser_declaration(declaration);
+				parserDeclaration(declaration);
 				innerCode.addCode("LABEL " + label1 + " :");
 
 				varNode var;
 				if (expression_statement->left->name == "expression") {
-					var = parser_expression(expression_statement->left);
+					var = parserExpression(expression_statement->left);
 
 					if (var.type == "bool") {
-						innerCode.addCode("IF " + var.boolString + " JUMP " + label2);
+						innerCode.addCode("IF " + var.boolString + " GOTO " + label2);
 					}
 					else {
 						string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 						++innerCode.tempNum;
-						varNode newznode = createTempVar(tempzeroname, "int");
+						varNode newznode = createVar(tempzeroname, "int");
 						innerCode.addCode(tempzeroname + " := #0");
 
-						innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " JUMP " + label2);
+						innerCode.addCode("IF " + innerCode.getNodeName(var) + " != " + tempzeroname + " GOTO " + label2);
 					}
 				}
 				else {
-					innerCode.addCode("JUMP " + label2);
+					innerCode.addCode("GOTO " + label2);
 				}
-				innerCode.addCode("JUMP " + label3);
+				innerCode.addCode("GOTO " + label3);
 				innerCode.addCode("LABEL " + label2 + " :");
 
-				parser_statement(statement);
+				parserStatement(statement);
 
-				parser_expression(expression);
+				parserExpression(expression);
 				//cout << "here" << endl;
-				innerCode.addCode("JUMP " + label1);
+				innerCode.addCode("GOTO " + label1);
 				innerCode.addCode("LABEL " + label3 + " :");
 
 				////如果需要break
@@ -560,7 +554,7 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 }
 
 //函数定义
-struct Tree* Parser::parser_function_definition(struct Tree* node) {
+TreePtr Parser::parserFunctionDefinition(TreePtr node) {
 	Tree* type_specifier = node->left;
 	Tree* declarator = node->left->right;
 	Tree* compound_statement = declarator->right;
@@ -577,7 +571,7 @@ struct Tree* Parser::parser_function_definition(struct Tree* node) {
 	if (funcPool.find(funcName) != funcPool.end()) {
 		//函数重复定义
 		if (funcPool[funcName].isdefinied) {
-			error(declarator->left->left->line, "Function " + funcName + " is duplicated definition.");
+			printError(declarator->left->left->line, "Function " + funcName + " is duplicated definition.");
 		}
 		//函数事先声明过但是没有定义
 		else {
@@ -602,28 +596,28 @@ struct Tree* Parser::parser_function_definition(struct Tree* node) {
 
 	//获取函数形参列表
 	if(declarator->left->right->right->name == "parameter_list")
-		parser_parameter_list(declarator->left->right->right, funcName,true);
+		parserParameterList(declarator->left->right->right, funcName,true);
 
 	//此时函数池中的func已经添加了参数列表
 	funcNode func = funcPool[funcName];
 	//如果函数事先声明过，则比较函数的参数列表和返回类型
 	if (isdeclared) {
 		if (func.rtype != declarFunc.rtype) {
-			error(type_specifier->left->line, "Function return type doesn't equal to the function declared before.");
+			printError(type_specifier->left->line, "Function return type doesn't equal to the function declared before.");
 		}
 		cout << funBlock.func.paralist.size() << endl;
 		if (func.paralist.size() != declarFunc.paralist.size()) {
-			error(declarator->left->right->right->line, "The number of function parameters doesn't equal to the function declared before.");
+			printError(declarator->left->right->right->line, "The number of function parameters doesn't equal to the function declared before.");
 		}
 		for (int i = 0; i < funBlock.func.paralist.size(); i++) {
 			if (func.paralist[i].type != declarFunc.paralist[i].type)
-				error(declarator->left->right->right->line, "The parameter " + funBlock.func.paralist[i].name + "'s type doesn't equal to the function declared before." );
+				printError(declarator->left->right->right->line, "The parameter " + funBlock.func.paralist[i].name + "'s type doesn't equal to the function declared before." );
 		}
 	}
 	//更新Block中func的参数列表
 	funBlock.func = func;
 	//分析函数的正文
-	parser_compound_statement(compound_statement);
+	parserCompoundStatement(compound_statement);
 
 	//函数结束后，弹出相应的block
 	recordStack.pop_back();
@@ -632,27 +626,27 @@ struct Tree* Parser::parser_function_definition(struct Tree* node) {
 }
 
 //获取函数形参列表，函数定义需要获取形参，声明则不需要
-void Parser::parser_parameter_list(struct Tree* node,string funcName,bool definite) {
+void Parser::parserParameterList(TreePtr node,string funcName,bool definite) {
 	if (node->left->name == "parameter_list") {
-		parser_parameter_list(node->left, funcName,definite);
+		parserParameterList(node->left, funcName,definite);
 	}
 	else if (node->left->name == "parameter_declaration") {
-		parser_parameter_declaration(node->left,funcName,definite);
+		parserParameterDeclaration(node->left,funcName,definite);
 	}
 
 	if (node->right->name == ",") {
-		parser_parameter_declaration(node->right->right, funcName,definite);
+		parserParameterDeclaration(node->right->right, funcName,definite);
 	}
 }
 
 //获取单个形参内容,函数定义需要获取形参，声明则不需要
-void Parser::parser_parameter_declaration(struct Tree* node, string funcName,bool definite) {
-	//cout << "parser_parameter_declaration" << endl;
+void Parser::parserParameterDeclaration(TreePtr node, string funcName,bool definite) {
+	//cout << "parserParameterDeclaration" << endl;
 	Tree* type_specifier = node->left;
 	Tree* declarator = node->left->right;
 	string typeName = type_specifier->left->content;
 	if (typeName == "void") {
-		error(type_specifier->line, "Void can't definite parameter.");
+		printError(type_specifier->line, "Void can't definite parameter.");
 	}
 	//================================================
 	//暂时只考虑变量，不考虑数组作为形参
@@ -675,54 +669,54 @@ void Parser::parser_parameter_declaration(struct Tree* node, string funcName,boo
 }
 
 
-struct Tree* Parser::parser_declaration(struct Tree *node) {
+TreePtr Parser::parserDeclaration(TreePtr node) {
 	//cout << "at " << node->name << endl;
 	//node = declaration
-	struct Tree* begin = node->left;	//begin:type_specifier
+	TreePtr begin = node->left;	//begin:type_specifier
 	if (begin->right->name == ";")
 		return node->right;
 	
 	string vartype = begin->left->content;
 
 	if (vartype == "void") {
-		error(begin->left->line,"void type can't assign to variable");	//报错
+		printError(begin->left->line,"void type can't assign to variable");	//报错
  	}
-	struct Tree* decl = begin->right;	//init_declarator_list
+	TreePtr decl = begin->right;	//init_declarator_list
 
 
 	/*while (decl->right) {
-		parser_init_declarator(vartype, decl->right->right);
+		parserInitDeclarator(vartype, decl->right->right);
 		decl = decl->left;
 	}
-	parser_init_declarator(vartype, decl);*/
-	parser_init_declarator_list(vartype, decl);
+	parserInitDeclarator(vartype, decl);*/
+	parserInitDeclaratorList(vartype, decl);
 	return node->right;
 
 }
 
-void Parser::parser_init_declarator_list(string vartype, struct Tree* node) {
+void Parser::parserInitDeclaratorList(string vartype, TreePtr node) {
 	if (node->left->name == "init_declarator_list") {
-		parser_init_declarator_list(vartype, node->left);
+		parserInitDeclaratorList(vartype, node->left);
 	}
 	else if (node->left->name == "init_declarator") {
-		parser_init_declarator(vartype, node->left);
+		parserInitDeclarator(vartype, node->left);
 	}
 
 	if (node->right->name == ",") {
-		parser_init_declarator(vartype, node->right->right);
+		parserInitDeclarator(vartype, node->right->right);
 	}
 }
 
 
 //分析变量初始化
-void Parser::parser_init_declarator(string vartype, struct Tree* node) {
+void Parser::parserInitDeclarator(string vartype, TreePtr node) {
 	//cout << "at " << node->name << endl;
-	struct Tree* declarator = node->left;
+	TreePtr declarator = node->left;
 
 	if (!declarator->right) {
 		//获取变量的名字
 		if (declarator->left->name == "IDENTIFIER") {
-			struct Tree* id = declarator->left;
+			TreePtr id = declarator->left;
 			string var = id->content;
 			if (!lookupCurruntVar(var)) {
 				varNode newvar;
@@ -731,7 +725,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 				newvar.num = innerCode.varNum++;
 				recordStack.back().varMap.insert({ var,newvar });
 			}
-			else error(declarator->left->line, "Variable multiple declaration.");
+			else printError(declarator->left->line, "Variable multiple declaration.");
 		}
 		else {
 			//函数声明
@@ -739,7 +733,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 				string funcName = declarator->left->left->content;
 				string funcType = vartype;
 				if (recordStack.size() > 1) {
-					error(declarator->left->right->line, "Functinon declaration must at global environment.");
+					printError(declarator->left->right->line, "Functinon declaration must at global environment.");
 				}
 				Tree* parameter_list = declarator->left->right->right;
 				funcNode newFunc;
@@ -748,17 +742,17 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 				newFunc.rtype = funcType;
 				funcPool.insert({ funcName,newFunc });
 				//分析函数形参列表
-				parser_parameter_list(parameter_list,funcName,false);
+				parserParameterList(parameter_list,funcName,false);
 			}
 			//数组声明
 			else if (declarator->left->right->name == "[") {
 				string arrayName = declarator->left->left->content;
 				string arrayType = vartype;
 				Tree* assign_exp = declarator->left->right->right;
-				varNode rnode = parser_assignment_expression(assign_exp);
+				varNode rnode = parserAssignmentExpression(assign_exp);
 
 				if (rnode.type != "int") {
-					error(declarator->left->right->line,"Array size must be int.");
+					printError(declarator->left->right->line,"Array size must be int.");
 				}
 				
 
@@ -767,7 +761,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 					//创建一个新的临时变量来储存数组的大小
 					string tempname = "temp" + inttostr(innerCode.tempNum);
 					++innerCode.tempNum;
-					tnode = createTempVar(tempname, "int");
+					tnode = createVar(tempname, "int");
 
 					recordStack.back().varMap.insert({ tempname,tnode });
 
@@ -786,7 +780,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 					//创建一个新的临时变量来储存数组的大小
 					string tempname = "temp" + inttostr(innerCode.tempNum);
 					++innerCode.tempNum;
-					tnode = createTempVar(tempname, "int");
+					tnode = createVar(tempname, "int");
 
 					recordStack.back().varMap.insert({ tempname,tnode });
 					
@@ -821,7 +815,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 		//获取变量的名字
 		varNode newvar;
 		if (declarator->left->name == "IDENTIFIER") {
-			struct Tree* id = declarator->left;
+			TreePtr id = declarator->left;
 			string var = id->content;
 			if (!lookupCurruntVar(var)) {
 				newvar.name = var;
@@ -829,45 +823,47 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 				newvar.num = innerCode.varNum++;
 				recordStack.back().varMap.insert({ var,newvar });
 			}
-			else error(declarator->left->line, "Variable multiple declaration.");
+			else printError(declarator->left->line, "Variable multiple declaration.");
 		}
-		else error(declarator->left->line, "It's not a variable!");
+		else printError(declarator->left->line, "It's not a variable!");
 
 
 		Tree* initializer = declarator->right->right;
 		if (initializer == NULL) {
-			error(declarator->line, "Lack the initializer for variable.");
+			printError(declarator->line, "Lack the initializer for variable.");
 		}
 		else {
 			if (initializer->left->name == "assignment_expression") {
-				varNode rnode = parser_assignment_expression(initializer->left);
+				varNode rnode = parserAssignmentExpression(initializer->left);
 				innerCode.addCode(innerCode.createCodeforAssign(newvar,rnode));
 				string rtype = rnode.type;
 				if (rtype != vartype)
-					error(initializer->left->line, "Wrong type to variable " + declarator->left->content + ": " + 
+					printError(initializer->left->line, "Wrong type to variable " + declarator->left->content + ": " + 
 					rtype + " to " + vartype);
 			}
 		}
 	}
-	else error(declarator->right->line, "Wrong value to variable");
+	else printError(declarator->right->line, "Wrong value to variable");
 }
 
-varNode Parser::parser_assignment_expression(struct Tree* assign_exp) {	//返回变量节点
+varNode Parser::parserAssignmentExpression(TreePtr assign_exp) {	//返回变量节点
 
-	//cout << "parser_assignment_expression" << endl;
+	//cout << "parserAssignmentExpression" << endl;
 
 	if (assign_exp->left->name == "logical_or_expression") {
-		struct Tree* logical_or_exp = assign_exp->left;
+		TreePtr logical_or_exp = assign_exp->left;
 
-		return parser_logical_or_expression(logical_or_exp);
+		return parserLogicalOrExpression(logical_or_exp);
 	}
 	//赋值运算
 	else if(assign_exp->left->name == "unary_expression"){
-		struct Tree* unary_exp = assign_exp->left;
+		TreePtr unary_exp = assign_exp->left;
 		string op = assign_exp->left->right->left->name;
-		struct Tree* next_assign_exp = assign_exp->left->right->right;
-		varNode node1 = parser_unary_expression(unary_exp);
-		varNode node2 = parser_assignment_expression(next_assign_exp);
+		TreePtr next_assign_exp = assign_exp->left->right
+			
+			->right;
+		varNode node1 = parserUnaryExpression(unary_exp);
+		varNode node2 = parserAssignmentExpression(next_assign_exp);
 		varNode node3;
 		if (op == "=") {
 			node3 = node2;
@@ -875,67 +871,67 @@ varNode Parser::parser_assignment_expression(struct Tree* assign_exp) {	//返回变
 		else {
 			string tempname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
-			node3 = createTempVar(tempname, node1.type);
+			node3 = createVar(tempname, node1.type);
 
 			recordStack.back().varMap.insert({ tempname,node3 });
 
 			if (op == "MUL_ASSIGN") { //*=
 				if (node1.type != node2.type) {
-					error(assign_exp->left->line, "Different type for two variables.");
+					printError(assign_exp->left->line, "Different type for two variables.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "*", node1, node2));
 			}
 			else if (op == "DIV_ASSIGN") { //*=
 				if (node1.type != node2.type) {
-					error(assign_exp->left->line, "Different type for two variables.");
+					printError(assign_exp->left->line, "Different type for two variables.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "/", node1, node2));
 			}
 			else if (op == "MOD_ASSIGN") { //*=
 				if (node1.type != "int" || node2.type != "int") {
-					error(assign_exp->left->line, "The two variables must be int.");
+					printError(assign_exp->left->line, "The two variables must be int.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "%", node1, node2));
 			}
 			else if (op == "ADD_ASSIGN") { //*=
 				if (node1.type != node2.type) {
-					error(assign_exp->left->line, "Different type for two variables.");
+					printError(assign_exp->left->line, "Different type for two variables.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "+", node1, node2));
 			}
 			else if (op == "SUB_ASSIGN") { //*=
 				if (node1.type != node2.type) {
-					error(assign_exp->left->line, "Different type for two variables.");
+					printError(assign_exp->left->line, "Different type for two variables.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "-", node1, node2));
 			}
 			else if (op == "LEFT_ASSIGN") { //*=
 				if (node1.type != "int" || node2.type != "int") {
-					error(assign_exp->left->line, "The two variables must be int.");
+					printError(assign_exp->left->line, "The two variables must be int.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "<<", node1, node2));
 			}
 			else if (op == "RIGHT_ASSIGN") { //*=
 				if (node1.type != "int" || node2.type != "int") {
-					error(assign_exp->left->line, "The two variables must be int.");
+					printError(assign_exp->left->line, "The two variables must be int.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, ">>", node1, node2));
 			}
 			else if (op == "AND_ASSIGN") { //*=
 				if (node1.type != "int" || node2.type != "int") {
-					error(assign_exp->left->line, "The two variables must be int.");
+					printError(assign_exp->left->line, "The two variables must be int.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "&", node1, node2));
 			}
 			else if (op == "XOR_ASSIGN") { //*=
 				if (node1.type != "int" || node2.type != "int") {
-					error(assign_exp->left->line, "The two variables must be int.");
+					printError(assign_exp->left->line, "The two variables must be int.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "^", node1, node2));
 			}
 			else if (op == "OR_ASSIGN") { //*=
 				if (node1.type != "int" || node2.type != "int") {
-					error(assign_exp->left->line, "The two variables must be int.");
+					printError(assign_exp->left->line, "The two variables must be int.");
 				}
 				innerCode.addCode(innerCode.createCodeforVar(tempname, "|", node1, node2));
 			}
@@ -946,24 +942,24 @@ varNode Parser::parser_assignment_expression(struct Tree* assign_exp) {	//返回变
 	}
 }
 
-varNode Parser::parser_logical_or_expression(struct Tree* logical_or_exp) {
+varNode Parser::parserLogicalOrExpression(TreePtr logical_or_exp) {
 
 	if(logical_or_exp->left->name == "logical_and_expression"){
-		struct Tree* logical_and_exp = logical_or_exp->left;
-		return parser_logical_and_expression(logical_and_exp);
+		TreePtr logical_and_exp = logical_or_exp->left;
+		return parserLogicalAndExpression(logical_and_exp);
 	}
 	else if (logical_or_exp->left->name == "logical_or_expression") {
 		//logical_or_expression -> logical_or_expression OR_OP logical_and_expression
-		varNode node1 = parser_logical_or_expression(logical_or_exp->left);
-		varNode node2 = parser_logical_and_expression(logical_or_exp->left->right->right);
+		varNode node1 = parserLogicalOrExpression(logical_or_exp->left);
+		varNode node2 = parserLogicalAndExpression(logical_or_exp->left->right->right);
 
 		if (node1.type != "bool" || node2.type != "bool") {
-			error(logical_or_exp->left->right->line, "Logical Or operation should only used to bool. ");
+			printError(logical_or_exp->left->right->line, "Logical Or operation should only used to bool. ");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newnode = createTempVar(tempname, node1.type);
+		varNode newnode = createVar(tempname, node1.type);
 
 		recordStack.back().varMap.insert({ tempname,newnode });
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "||", node1, node2));
@@ -976,23 +972,23 @@ varNode Parser::parser_logical_or_expression(struct Tree* logical_or_exp) {
 
 }
 
-varNode Parser::parser_logical_and_expression(struct Tree* logical_and_exp) {
+varNode Parser::parserLogicalAndExpression(TreePtr logical_and_exp) {
 	
 	if (logical_and_exp->left->name == "inclusive_or_expression") {
 		Tree* inclusive_or_exp = logical_and_exp->left;
-		return parser_inclusive_or_expression(inclusive_or_exp);
+		return parserInclusiveOrExpression(inclusive_or_exp);
 	}
 	else if (logical_and_exp->left->name == "logical_and_expression") {
-		varNode node1 = parser_logical_and_expression(logical_and_exp->left);
-		varNode node2 = parser_inclusive_or_expression(logical_and_exp->left->right->right);
+		varNode node1 = parserLogicalAndExpression(logical_and_exp->left);
+		varNode node2 = parserInclusiveOrExpression(logical_and_exp->left->right->right);
 
 		if (node1.type != "bool" || node2.type != "bool") {
-			error(logical_and_exp->left->right->line, "Logical And operation should only used to bool. ");
+			printError(logical_and_exp->left->right->line, "Logical And operation should only used to bool. ");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newnode = createTempVar(tempname, node1.type);
+		varNode newnode = createVar(tempname, node1.type);
 		recordStack.back().varMap.insert({ tempname,newnode });
 	
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "&&", node1, node2));
@@ -1004,69 +1000,69 @@ varNode Parser::parser_logical_and_expression(struct Tree* logical_and_exp) {
 	}
 }
 
-varNode Parser::parser_inclusive_or_expression(struct Tree* inclusive_or_exp) {
+varNode Parser::parserInclusiveOrExpression(TreePtr inclusive_or_exp) {
 	
 	if (inclusive_or_exp->left->name == "exclusive_or_expression") {
 		Tree* exclusive_or_exp = inclusive_or_exp->left;
-		return parser_exclusive_or_expression(exclusive_or_exp);
+		return parserExclusiveOrExpression(exclusive_or_exp);
 	}
 	else if (inclusive_or_exp->left->name == "inclusive_or_expression") {
-		varNode node1 = parser_inclusive_or_expression(inclusive_or_exp->left);
-		varNode node2 = parser_exclusive_or_expression(inclusive_or_exp->left->right->right);
+		varNode node1 = parserInclusiveOrExpression(inclusive_or_exp->left);
+		varNode node2 = parserExclusiveOrExpression(inclusive_or_exp->left->right->right);
 
 		if (node1.type != "int" || node2.type != "int") {
-			error(inclusive_or_exp->left->right->line, "Inclusive Or operation should only used to int. ");
+			printError(inclusive_or_exp->left->right->line, "Inclusive Or operation should only used to int. ");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newnode = createTempVar(tempname, node1.type);
+		varNode newnode = createVar(tempname, node1.type);
 		recordStack.back().varMap.insert({ tempname,newnode });
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "|", node1, node2));
 		return newnode;
 	}
 }
 
-varNode Parser::parser_exclusive_or_expression(struct Tree *exclusive_or_exp) {
+varNode Parser::parserExclusiveOrExpression(TreePtr exclusive_or_exp) {
 	
 	if (exclusive_or_exp->left->name == "and_expression") {
 		Tree* and_exp = exclusive_or_exp->left;
-		return parser_and_expression(and_exp);
+		return parserAndExpression(and_exp);
 	}
 	else if (exclusive_or_exp->left->name == "exclusive_or_expression") {
-		varNode node1 = parser_exclusive_or_expression(exclusive_or_exp->left);
-		varNode node2 = parser_and_expression(exclusive_or_exp->left->right->right);
+		varNode node1 = parserExclusiveOrExpression(exclusive_or_exp->left);
+		varNode node2 = parserAndExpression(exclusive_or_exp->left->right->right);
 
 		if (node1.type != "int" || node2.type != "int") {
-			error(exclusive_or_exp->left->right->line, "Exclusive Or operation should only used to int. ");
+			printError(exclusive_or_exp->left->right->line, "Exclusive Or operation should only used to int. ");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newnode = createTempVar(tempname, node1.type);
+		varNode newnode = createVar(tempname, node1.type);
 		recordStack.back().varMap.insert({ tempname,newnode });
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "^", node1, node2));
 		return newnode;
 	}
 }
 
-varNode Parser::parser_and_expression(struct Tree* and_exp) {
+varNode Parser::parserAndExpression(TreePtr and_exp) {
 	if (and_exp->left->name == "equality_expression") {
 		Tree* equality_exp = and_exp->left;
-		return parser_equality_expression(equality_exp);
+		return parserEqualityExpression(equality_exp);
 	}
 	else if (and_exp->left->name == "and_expression") {
-		varNode node1 = parser_and_expression(and_exp->left);
-		varNode node2 = parser_equality_expression(and_exp->left->right->right);
+		varNode node1 = parserAndExpression(and_exp->left);
+		varNode node2 = parserEqualityExpression(and_exp->left->right->right);
 
 		if (node1.type != "int" || node2.type != "int") {
-			error(and_exp->left->right->line, "And operation should only used to int. ");
+			printError(and_exp->left->right->line, "And operation should only used to int. ");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 
-		varNode newnode = createTempVar(tempname, node1.type);
+		varNode newnode = createVar(tempname, node1.type);
 
 		recordStack.back().varMap.insert({ tempname,newnode });
 		innerCode.addCode(innerCode.createCodeforVar(tempname, "&", node1, node2));
@@ -1074,11 +1070,11 @@ varNode Parser::parser_and_expression(struct Tree* and_exp) {
 	}
 }
 
-varNode Parser::parser_equality_expression(struct Tree* equality_exp) {
+varNode Parser::parserEqualityExpression(TreePtr equality_exp) {
 	
 	if (equality_exp->left->name == "relational_expression") {
 		Tree* relational_exp = equality_exp->left;
-		return parser_relational_expression(relational_exp);
+		return parserRelationalExpression(relational_exp);
 	}
 	else if (equality_exp->left->right->name == "EQ_OP" || equality_exp->left->right->name == "NE_OP") {
 		string op;
@@ -1086,17 +1082,17 @@ varNode Parser::parser_equality_expression(struct Tree* equality_exp) {
 			op = "==";
 		else op = "!=";
 
-		varNode node1 = parser_equality_expression(equality_exp->left);
-		varNode node2 = parser_relational_expression(equality_exp->left->right->right);
+		varNode node1 = parserEqualityExpression(equality_exp->left);
+		varNode node2 = parserRelationalExpression(equality_exp->left->right->right);
 
 		if (node1.type != node2.type) {
-			error(equality_exp->left->right->line, "Different type for two variables.");
+			printError(equality_exp->left->right->line, "Different type for two variables.");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 
-		varNode newnode = createTempVar(tempname, "bool");
+		varNode newnode = createVar(tempname, "bool");
 		recordStack.back().varMap.insert({ tempname,newnode});
 		innerCode.addCode(innerCode.createCodeforVar(tempname, op, node1, node2));
 
@@ -1106,10 +1102,10 @@ varNode Parser::parser_equality_expression(struct Tree* equality_exp) {
 	}
 }
 
-varNode Parser::parser_relational_expression(struct Tree* relational_exp) {
+varNode Parser::parserRelationalExpression(TreePtr relational_exp) {
 	if (relational_exp->left->name == "shift_expression") {
 		Tree* shift_exp = relational_exp->left;
-		return parser_shift_expression(shift_exp);
+		return parserShiftExpression(shift_exp);
 	}
 	else {
 		string op = relational_exp->left->right->name;
@@ -1118,17 +1114,17 @@ varNode Parser::parser_relational_expression(struct Tree* relational_exp) {
 		else if (op == "GE_OP")
 			op = ">=";
 		if (op == ">" || op == "<" || op == ">=" || op == "<=") {
-			varNode node1 = parser_relational_expression(relational_exp->left);
-			varNode node2 = parser_shift_expression(relational_exp->left->right->right);
+			varNode node1 = parserRelationalExpression(relational_exp->left);
+			varNode node2 = parserShiftExpression(relational_exp->left->right->right);
 
 			if (node1.type != node2.type) {
-				error(relational_exp->left->right->line, "Different type for two variables.");
+				printError(relational_exp->left->right->line, "Different type for two variables.");
 			}
 
 			string tempname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
 
-			varNode newnode = createTempVar(tempname, "bool");
+			varNode newnode = createVar(tempname, "bool");
 			recordStack.back().varMap.insert({ tempname,newnode });
 			innerCode.addCode(innerCode.createCodeforVar(tempname, op, node1, node2));
 
@@ -1139,10 +1135,10 @@ varNode Parser::parser_relational_expression(struct Tree* relational_exp) {
 	}
 }
 
-varNode Parser::parser_shift_expression(struct Tree*shift_exp) {
+varNode Parser::parserShiftExpression(TreePtr shift_exp) {
 	if (shift_exp->left->name == "additive_expression") {
 		Tree* additive_exp = shift_exp->left;
-		return parser_additive_expression(additive_exp);
+		return parserAdditiveExpression(additive_exp);
 	}
 	else if (shift_exp->left->right->name == "LEFT_OP" || shift_exp->left->right->name == "RIGHT_OP") {
 		string op;
@@ -1151,17 +1147,17 @@ varNode Parser::parser_shift_expression(struct Tree*shift_exp) {
 		}
 		else op = ">>";
 
-		varNode node1 = parser_shift_expression(shift_exp->left);
-		varNode node2 = parser_additive_expression(shift_exp->left->right->right);
+		varNode node1 = parserShiftExpression(shift_exp->left);
+		varNode node2 = parserAdditiveExpression(shift_exp->left->right->right);
 
 		if (node1.type != "int" || node2.type != "int" ) {
-			error(shift_exp->left->right->line, "Shift operation should only used to int. ");
+			printError(shift_exp->left->right->line, "Shift operation should only used to int. ");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 
-		varNode newnode = createTempVar(tempname, node1.type);
+		varNode newnode = createVar(tempname, node1.type);
 
 		recordStack.back().varMap.insert({ tempname,newnode });
 
@@ -1170,22 +1166,22 @@ varNode Parser::parser_shift_expression(struct Tree*shift_exp) {
 	}
 }
 
-varNode Parser::parser_additive_expression(struct Tree* additive_exp) {
+varNode Parser::parserAdditiveExpression(TreePtr additive_exp) {
 	if (additive_exp->left->name == "multiplicative_expression") {
 		Tree* mult_exp = additive_exp->left;
-		return parser_multiplicative_expression(mult_exp);
+		return parserMultiplicativeExpression(mult_exp);
 	}
 	else if (additive_exp->left->right->name == "+" || additive_exp->left->right->name == "-") {
-		varNode node1 = parser_additive_expression(additive_exp->left);
-		varNode node2 = parser_multiplicative_expression(additive_exp->left->right->right);
+		varNode node1 = parserAdditiveExpression(additive_exp->left);
+		varNode node2 = parserMultiplicativeExpression(additive_exp->left->right->right);
 
 		if (node1.type != node2.type) {
-			error(additive_exp->left->right->line, "Different type for two variables.");
+			printError(additive_exp->left->right->line, "Different type for two variables.");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newnode = createTempVar(tempname, node1.type);
+		varNode newnode = createVar(tempname, node1.type);
 		recordStack.back().varMap.insert({ tempname,newnode});
 
 		innerCode.addCode(innerCode.createCodeforVar(tempname, additive_exp->left->right->name, node1, node2));
@@ -1193,24 +1189,24 @@ varNode Parser::parser_additive_expression(struct Tree* additive_exp) {
 	}
 }
 
-varNode Parser::parser_multiplicative_expression(struct Tree* mult_exp) {
+varNode Parser::parserMultiplicativeExpression(TreePtr mult_exp) {
 
 	if (mult_exp->left->name == "unary_expression") {
 		Tree* unary_exp = mult_exp->left;
-		return parser_unary_expression(unary_exp);
+		return parserUnaryExpression(unary_exp);
 	}
 	else if (mult_exp->left->right->name == "*" || mult_exp->left->right->name == "/" || 
 		mult_exp->left->right->name == "%") {
-		varNode node1 = parser_multiplicative_expression(mult_exp->left);
-		varNode node2 = parser_unary_expression(mult_exp->left->right->right);
+		varNode node1 = parserMultiplicativeExpression(mult_exp->left);
+		varNode node2 = parserUnaryExpression(mult_exp->left->right->right);
 
 		if (node1.type != node2.type) {
-			error(mult_exp->left->right->line, "Different type for two variables.");
+			printError(mult_exp->left->right->line, "Different type for two variables.");
 		}
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newNode = createTempVar(tempname, node1.type);
+		varNode newNode = createVar(tempname, node1.type);
 		recordStack.back().varMap.insert({ tempname,newNode });
 
 		innerCode.addCode(innerCode.createCodeforVar(tempname, mult_exp->left->right->name,node1,node2));
@@ -1219,19 +1215,19 @@ varNode Parser::parser_multiplicative_expression(struct Tree* mult_exp) {
 	}
 }
 
-varNode Parser::parser_unary_expression(struct Tree*unary_exp) {
+varNode Parser::parserUnaryExpression(TreePtr unary_exp) {
 	if (unary_exp->left->name == "postfix_expression") {
 		Tree* post_exp = unary_exp->left;
-		return parser_postfix_expression(post_exp);
+		return parserPostfixExpression(post_exp);
 	}
 	else if (unary_exp->left->name == "INC_OP") {
-		varNode rnode = parser_unary_expression(unary_exp->left->right);
+		varNode rnode = parserUnaryExpression(unary_exp->left->right);
 		if (rnode.type != "int")
-			error(unary_exp->left->right->line, "++ operation can only use for int type.");
+			printError(unary_exp->left->right->line, "++ operation can only use for int type.");
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newNode = createTempVar(tempname, "int");
+		varNode newNode = createVar(tempname, "int");
 		recordStack.back().varMap.insert({ tempname,newNode });
 
 		innerCode.addCode(tempname + " := #1");
@@ -1249,13 +1245,13 @@ varNode Parser::parser_unary_expression(struct Tree*unary_exp) {
 	}
 	else if (unary_exp->left->name == "DEC_OP") {
 
-		varNode rnode = parser_unary_expression(unary_exp->left->right);
+		varNode rnode = parserUnaryExpression(unary_exp->left->right);
 		if (rnode.type != "int")
-			error(unary_exp->left->right->line, "-- operation can only use for int type.");
+			printError(unary_exp->left->right->line, "-- operation can only use for int type.");
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newNode = createTempVar(tempname, "int");
+		varNode newNode = createVar(tempname, "int");
 		recordStack.back().varMap.insert({ tempname,newNode });
 
 		innerCode.addCode(tempname + " := #1");
@@ -1272,27 +1268,27 @@ varNode Parser::parser_unary_expression(struct Tree*unary_exp) {
 	}
 	else if (unary_exp->left->name == "unary_operator") {
 		string op = unary_exp->left->left->name;
-		varNode rnode = parser_unary_expression(unary_exp->left->right);
+		varNode rnode = parserUnaryExpression(unary_exp->left->right);
 		if (op == "+") {
 
 			if (rnode.type != "int" && rnode.type != "double")
-				error(unary_exp->left->left->line, "operator '+' can only used to int or double");
+				printError(unary_exp->left->left->line, "operator '+' can only used to int or double");
 			return rnode;
 		}
 		else if (op == "-") {
 
 			if (rnode.type != "int" && rnode.type != "double")
-				error(unary_exp->left->left->line, "operator '-' can only used to int or double");
+				printError(unary_exp->left->left->line, "operator '-' can only used to int or double");
 
 			string tempzeroname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
-			varNode newzeronode = createTempVar(tempzeroname, rnode.type);
+			varNode newzeronode = createVar(tempzeroname, rnode.type);
 			recordStack.back().varMap.insert({ tempzeroname,newzeronode });
 			innerCode.addCode(tempzeroname + " := #0");
 
 			string tempname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
-			varNode newnode = createTempVar(tempname, rnode.type);
+			varNode newnode = createVar(tempname, rnode.type);
 			recordStack.back().varMap.insert({ tempname,newnode });
 
 
@@ -1313,21 +1309,21 @@ varNode Parser::parser_unary_expression(struct Tree*unary_exp) {
 	}
 }
 
-varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
+varNode Parser::parserPostfixExpression(TreePtr post_exp) {
 	//cout << "here" << endl;
 	if (post_exp->left->name == "primary_expression") {
 		Tree* primary_exp = post_exp->left;
-		return parser_primary_expression(primary_exp);
+		return parserPrimaryExpression(primary_exp);
 	}
 	else if (post_exp->left->right->name == "[") {
 		//数组调用
 		string arrayName = post_exp->left->left->left->content;
 		Tree* expression = post_exp->left->right->right;
-		varNode enode = parser_expression(expression);
+		varNode enode = parserExpression(expression);
 		arrayNode anode = getArrayNode(arrayName);
 
 		if (anode.num < 0)
-			error(post_exp->left->right->line, "Undifined array " + arrayName);
+			printError(post_exp->left->right->line, "Undifined array " + arrayName);
 
 		varNode tempVar;
 		string tempName = "temp" + inttostr(innerCode.tempNum);
@@ -1385,12 +1381,12 @@ varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
 		varNode newNode;
 		
 		if (funcPool.find(funcName) == funcPool.end()) {
-			error(post_exp->left->left->left->line, "Undefined function " + funcName);
+			printError(post_exp->left->left->left->line, "Undefined function " + funcName);
 		}
 
 		if (post_exp->left->right->right->name == "argument_expression_list") {
 			Tree* argument_exp_list = post_exp->left->right->right;
-			parser_argument_expression_list(argument_exp_list, funcName);
+			parserArgumentExpressionList(argument_exp_list, funcName);
 			//cout << "funcCall" << endl;
 
 		}
@@ -1404,7 +1400,7 @@ varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
 			string tempname = "temp" + inttostr(innerCode.tempNum);
 			++innerCode.tempNum;
 
-			newNode = createTempVar(tempname, funcPool[funcName].rtype);
+			newNode = createVar(tempname, funcPool[funcName].rtype);
 			innerCode.addCode(tempname + " := CALL " + funcName);
 
 		}
@@ -1413,19 +1409,19 @@ varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
 		
 	}
 	else if (post_exp->left->right->name == "INC_OP") {
-		varNode rnode = parser_postfix_expression(post_exp->left);
+		varNode rnode = parserPostfixExpression(post_exp->left);
 
 		if (rnode.type != "int")
-			error(post_exp->left->right->line, "++ operation can only use for int type.");
+			printError(post_exp->left->right->line, "++ operation can only use for int type.");
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newnode = createTempVar(tempname, "int");
+		varNode newnode = createVar(tempname, "int");
 		recordStack.back().varMap.insert({ tempname,newnode });
 
 		string tempnameone = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newNode = createTempVar(tempnameone, "int");
+		varNode newNode = createVar(tempnameone, "int");
 		recordStack.back().varMap.insert({ tempnameone,newNode });
 
 		innerCode.addCode(tempnameone + " := #1");
@@ -1444,19 +1440,19 @@ varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
 	}
 	else if (post_exp->left->right->name == "DEC_OP") {
 
-		varNode rnode = parser_postfix_expression(post_exp->left);
+		varNode rnode = parserPostfixExpression(post_exp->left);
 
 		if (rnode.type != "int")
-			error(post_exp->left->right->line, "-- operation can only use for int type.");
+			printError(post_exp->left->right->line, "-- operation can only use for int type.");
 
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newnode = createTempVar(tempname, "int");
+		varNode newnode = createVar(tempname, "int");
 		recordStack.back().varMap.insert({ tempname,newnode });
 
 		string tempnameone = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newNode = createTempVar(tempnameone, "int");
+		varNode newNode = createVar(tempnameone, "int");
 		recordStack.back().varMap.insert({ tempnameone,newNode });
 
 		innerCode.addCode(tempnameone + " := #1");
@@ -1475,38 +1471,38 @@ varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
 	}
 }
 
-void Parser::parser_argument_expression_list(struct Tree* node, string funcName) {
+void Parser::parserArgumentExpressionList(TreePtr node, string funcName) {
 	Tree* argu_exp_list = node->left;
 	funcNode func = funcPool[funcName];
 	int i = 0;
 	while (argu_exp_list->name == "argument_expression_list") {
-		varNode rnode = parser_assignment_expression(argu_exp_list->right->right);
+		varNode rnode = parserAssignmentExpression(argu_exp_list->right->right);
 
 		innerCode.addCode(innerCode.createCodeforArgument(rnode));
 
 		argu_exp_list = argu_exp_list->left;
 		i++;
 		if (func.paralist[func.paralist.size() - i].type != rnode.type) {
-			error(argu_exp_list->line, "Wrong type arguments to function " + funcName);
+			printError(argu_exp_list->line, "Wrong type arguments to function " + funcName);
 		}
 	}
-	varNode rnode = parser_assignment_expression(argu_exp_list);
+	varNode rnode = parserAssignmentExpression(argu_exp_list);
 	innerCode.addCode(innerCode.createCodeforArgument(rnode));
 	i++;
 	if (func.paralist[func.paralist.size() - i].type != rnode.type) {
-		error(argu_exp_list->line, "Wrong type arguments to function " + funcName);
+		printError(argu_exp_list->line, "Wrong type arguments to function " + funcName);
 	}
 	if (i != func.paralist.size()) {
-		error(argu_exp_list->line, "The number of arguments doesn't equal to the function parameters number.");
+		printError(argu_exp_list->line, "The number of arguments doesn't equal to the function parameters number.");
 	}
 }
 
-varNode Parser::parser_primary_expression(struct Tree* primary_exp) {
+varNode Parser::parserPrimaryExpression(TreePtr primary_exp) {
 	if (primary_exp->left->name == "IDENTIFIER") {
 		string content = primary_exp->left->content;
 		varNode rnode = lookupNode(content);
 		if (rnode.num < 0) {
-			error(primary_exp->left->line, "Undefined variable " + content);
+			printError(primary_exp->left->line, "Undefined variable " + content);
 		}
 		return rnode;
 	}
@@ -1514,7 +1510,7 @@ varNode Parser::parser_primary_expression(struct Tree* primary_exp) {
 		string content = primary_exp->left->content;
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
-		varNode newNode = createTempVar(tempname, "bool");
+		varNode newNode = createVar(tempname, "bool");
 		recordStack.back().varMap.insert({ tempname,newNode });
 		if(primary_exp->left->name == "TRUE") 
 			innerCode.addCode(tempname + " := #1");
@@ -1528,7 +1524,7 @@ varNode Parser::parser_primary_expression(struct Tree* primary_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 		
-		varNode newNode = createTempVar(tempname, "int");
+		varNode newNode = createVar(tempname, "int");
 		recordStack.back().varMap.insert({ tempname,newNode });
 		innerCode.addCode(tempname + " := #"  + content);
 		return newNode;
@@ -1538,15 +1534,15 @@ varNode Parser::parser_primary_expression(struct Tree* primary_exp) {
 		string tempname = "temp" + inttostr(innerCode.tempNum);
 		++innerCode.tempNum;
 
-		varNode newNode = createTempVar(tempname, "double");
+		varNode newNode = createVar(tempname, "double");
 
 		recordStack.back().varMap.insert({ tempname,newNode});
 		innerCode.addCode(tempname + " := F" + content);
 		return newNode;
 	}
 	else if (primary_exp->left->name == "(") {
-		struct Tree* expression = primary_exp->left->right;
-		return parser_expression(expression);
+		TreePtr expression = primary_exp->left->right;
+		return parserExpression(expression);
 	}
 }
 
@@ -1614,7 +1610,7 @@ int Parser::getBreakRecordNumber() {
 	return -1;
 }
 
-void Parser::error(int line, string error) {
+void Parser::printError(int line, string error) {
 
 	print_code();
 
@@ -1623,7 +1619,7 @@ void Parser::error(int line, string error) {
 	exit(1);
 }
 
-struct varNode Parser::createTempVar(string name, string type) {
+struct varNode Parser::createVar(string name, string type) {
 	varNode var;
 	var.name = name;
 	var.type = type;
