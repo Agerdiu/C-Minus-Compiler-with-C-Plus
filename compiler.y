@@ -11,7 +11,7 @@ extern char *yytext;
 extern int column;
 extern FILE * yyin;
 extern FILE * yyout;
-Tree *root;
+struct Tree* root;
 extern int yylineno;
 
 int yylex(void);

@@ -6,7 +6,7 @@
 #include "record.h"
 #include "codeOptimize.h"
 #include<string>
-extern struct Tree* root;
+extern TreePtr root;
 
 using namespace std;
 

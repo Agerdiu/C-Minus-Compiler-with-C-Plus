@@ -4,7 +4,7 @@
 #include<map>
 using namespace std;
 
-Parser::Parser(Tree* root) {
+Parser::Parser(TreePtr root) {
 	this->root = root;
 	Init();
 }
@@ -35,7 +35,7 @@ void Parser::Init() {
 	parseTree(root);		//开始分析语法树
 }
 
-void Parser::parseTree(struct Tree* node) {
+void Parser::parseTree(TreePtr node) {
 	if (node == NULL || node->line == -1)
 		return;
 
@@ -56,8 +56,8 @@ void Parser::parseTree(struct Tree* node) {
 	}
 }
 
-struct Tree* Parser::parser_statement(struct Tree* node) {
-	struct Tree* next = node->left;
+TreePtr Parser::parser_statement(TreePtr node) {
+	TreePtr next = node->left;
 	if (node->left->name == "labeled_statement") {
 
 	}
@@ -80,7 +80,7 @@ struct Tree* Parser::parser_statement(struct Tree* node) {
 	return node->right;
 }
 
-void Parser::parser_jump_statement(struct Tree* node) {
+void Parser::parser_jump_statement(TreePtr node) {
 	if (node->left->name == "JUMP") {
 
 	}
@@ -113,13 +113,13 @@ void Parser::parser_jump_statement(struct Tree* node) {
 	}
 }
 
-void Parser::parser_expression_statement(struct Tree *node) {
+void Parser::parser_expression_statement(TreePtr node) {
 	if (node->left->name == "expression") {
 		parser_expression(node->left);
 	}
 }
 
-varNode Parser::parser_expression(struct Tree* node) {
+varNode Parser::parser_expression(TreePtr node) {
 	if (node->left->name == "expression") {
 		return parser_expression(node->left);
 	}
@@ -131,13 +131,13 @@ varNode Parser::parser_expression(struct Tree* node) {
 	}
 }
 
-void Parser::parser_compound_statement(struct Tree* node) {
+void Parser::parser_compound_statement(TreePtr node) {
 	//继续分析处理compound_statement
 	parseTree(node);
 }
 
 //if else
-void Parser::parser_selection_statement(struct Tree* node) {
+void Parser::parser_selection_statement(TreePtr node) {
 
 
 	if (node->left->name == "IF") {
@@ -146,9 +146,9 @@ void Parser::parser_selection_statement(struct Tree* node) {
 			Record newrecord;
 			recordStack.push_back(newrecord);
 
-			Tree* expression = node->left->right->right;
+			TreePtr expression = node->left->right->right;
 			varNode exp_rnode = parser_expression(expression);
-			Tree* statement = node->left->right->right->right->right;
+			TreePtr statement = node->left->right->right->right->right;
 
 			string label1 = innerCode.getLabelName();
 			string label2 = innerCode.getLabelName();
@@ -182,10 +182,10 @@ void Parser::parser_selection_statement(struct Tree* node) {
 			Record newrecord1;
 			recordStack.push_back(newrecord1);
 
-			Tree* expression = node->left->right->right;
+			TreePtr expression = node->left->right->right;
 			varNode exp_rnode = parser_expression(expression);
-			Tree* statement1 = node->left->right->right->right->right;
-			Tree* statement2 = node->left->right->right->right->right->right->right;
+			TreePtr statement1 = node->left->right->right->right->right;
+			TreePtr statement2 = node->left->right->right->right->right->right->right;
 
 			string label1 = innerCode.getLabelName();
 			string label2 = innerCode.getLabelName();
@@ -234,7 +234,7 @@ void Parser::parser_selection_statement(struct Tree* node) {
 }
 
 //循环 while for do while
-void Parser::parser_iteration_statement(struct Tree* node) {
+void Parser::parser_iteration_statement(TreePtr node) {
 	if (node->left->name == "WHILE") {
 
 		//添加一个新的block
@@ -242,8 +242,8 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 		newrecord.canBreak = true;
 		recordStack.push_back(newrecord);
 
-		struct Tree* expression = node->left->right->right;
-		struct Tree* statement = node->left->right->right->right->right;
+		TreePtr expression = node->left->right->right;
+		TreePtr statement = node->left->right->right->right->right;
 
 		string label1 = innerCode.getLabelName();
 		string label2 = innerCode.getLabelName();
@@ -284,8 +284,8 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 		newrecord.canBreak = true;
 		recordStack.push_back(newrecord);
 
-		struct Tree* statement = node->left->right;
-		struct Tree* expression = node->left->right->right->right->right;
+		TreePtr statement = node->left->right;
+		TreePtr expression = node->left->right->right->right->right;
 
 		string label1 = innerCode.getLabelName();
 		string label2 = innerCode.getLabelName();
@@ -326,9 +326,9 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 				newblock.canBreak = true;
 				recordStack.push_back(newblock);
 
-				Tree* exp_state1 = node->left->right->right;
-				Tree* exp_state2 = exp_state1->right;
-				Tree* statement = exp_state2->right->right;
+				TreePtr exp_state1 = node->left->right->right;
+				TreePtr exp_state2 = exp_state1->right;
+				TreePtr statement = exp_state2->right->right;
 
 				string label1 = innerCode.getLabelName();
 				string label2 = innerCode.getLabelName();
@@ -383,10 +383,10 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 				newblock.canBreak = true;
 				recordStack.push_back(newblock);
 
-				Tree* exp_state1 = node->left->right->right;
-				Tree* exp_state2 = exp_state1->right;
-				Tree* exp = exp_state2->right;
-				Tree* statement = exp->right->right;
+				TreePtr exp_state1 = node->left->right->right;
+				TreePtr exp_state2 = exp_state1->right;
+				TreePtr exp = exp_state2->right;
+				TreePtr statement = exp->right->right;
 
 				string label1 = innerCode.getLabelName();
 				string label2 = innerCode.getLabelName();
@@ -560,10 +560,10 @@ void Parser::parser_iteration_statement(struct Tree* node) {
 }
 
 //函数定义
-struct Tree* Parser::parser_function_definition(struct Tree* node) {
-	Tree* type_specifier = node->left;
-	Tree* declarator = node->left->right;
-	Tree* compound_statement = declarator->right;
+TreePtr Parser::parser_function_definition(TreePtr node) {
+	TreePtr type_specifier = node->left;
+	TreePtr declarator = node->left->right;
+	TreePtr compound_statement = declarator->right;
 	
 	string funcType = type_specifier->left->content;
 	string funcName = declarator->left->left->content;
@@ -632,7 +632,7 @@ struct Tree* Parser::parser_function_definition(struct Tree* node) {
 }
 
 //获取函数形参列表，函数定义需要获取形参，声明则不需要
-void Parser::parser_parameter_list(struct Tree* node,string funcName,bool definite) {
+void Parser::parser_parameter_list(TreePtr node,string funcName,bool definite) {
 	if (node->left->name == "parameter_list") {
 		parser_parameter_list(node->left, funcName,definite);
 	}
@@ -646,10 +646,10 @@ void Parser::parser_parameter_list(struct Tree* node,string funcName,bool defini
 }
 
 //获取单个形参内容,函数定义需要获取形参，声明则不需要
-void Parser::parser_parameter_declaration(struct Tree* node, string funcName,bool definite) {
+void Parser::parser_parameter_declaration(TreePtr node, string funcName,bool definite) {
 	//cout << "parser_parameter_declaration" << endl;
-	Tree* type_specifier = node->left;
-	Tree* declarator = node->left->right;
+	TreePtr type_specifier = node->left;
+	TreePtr declarator = node->left->right;
 	string typeName = type_specifier->left->content;
 	if (typeName == "void") {
 		error(type_specifier->line, "Void can't definite parameter.");
@@ -674,10 +674,10 @@ void Parser::parser_parameter_declaration(struct Tree* node, string funcName,boo
 }
 
 
-struct Tree* Parser::parser_declaration(struct Tree *node) {
+TreePtr Parser::parser_declaration(TreePtr node) {
 	//cout << "at " << node->name << endl;
 	//node = declaration
-	struct Tree* begin = node->left;	//begin:type_specifier
+	TreePtr begin = node->left;	//begin:type_specifier
 	if (begin->right->name == ";")
 		return node->right;
 	
@@ -686,7 +686,7 @@ struct Tree* Parser::parser_declaration(struct Tree *node) {
 	if (vartype == "void") {
 		error(begin->left->line,"void type can't assign to variable");	//报错
  	}
-	struct Tree* decl = begin->right;	//init_declarator_list
+	TreePtr decl = begin->right;	//init_declarator_list
 
 
 	/*while (decl->right) {
@@ -699,7 +699,7 @@ struct Tree* Parser::parser_declaration(struct Tree *node) {
 
 }
 
-void Parser::parser_init_declarator_list(string vartype, struct Tree* node) {
+void Parser::parser_init_declarator_list(string vartype, TreePtr node) {
 	if (node->left->name == "init_declarator_list") {
 		parser_init_declarator_list(vartype, node->left);
 	}
@@ -714,14 +714,14 @@ void Parser::parser_init_declarator_list(string vartype, struct Tree* node) {
 
 
 //分析变量初始化
-void Parser::parser_init_declarator(string vartype, struct Tree* node) {
+void Parser::parser_init_declarator(string vartype, TreePtr node) {
 	//cout << "at " << node->name << endl;
-	struct Tree* declarator = node->left;
+	TreePtr declarator = node->left;
 
 	if (!declarator->right) {
 		//获取变量的名字
 		if (declarator->left->name == "IDENTIFIER") {
-			struct Tree* id = declarator->left;
+			TreePtr id = declarator->left;
 			string var = id->content;
 			if (!lookupCurruntVar(var)) {
 				varNode newvar;
@@ -740,7 +740,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 				if (recordStack.size() > 1) {
 					error(declarator->left->right->line, "Functinon declaration must at global environment.");
 				}
-				Tree* parameter_list = declarator->left->right->right;
+				TreePtr parameter_list = declarator->left->right->right;
 				funcNode newFunc;
 				newFunc.isdefinied = false;
 				newFunc.name = funcName;
@@ -753,7 +753,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 			else if (declarator->left->right->name == "[") {
 				string arrayName = declarator->left->left->content;
 				string arrayType = vartype;
-				Tree* assign_exp = declarator->left->right->right;
+				TreePtr assign_exp = declarator->left->right->right;
 				varNode rnode = parser_assignment_expression(assign_exp);
 
 				if (rnode.type != "int") {
@@ -816,7 +816,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 		//获取变量的名字
 		varNode newvar;
 		if (declarator->left->name == "IDENTIFIER") {
-			struct Tree* id = declarator->left;
+			TreePtr id = declarator->left;
 			string var = id->content;
 			if (!lookupCurruntVar(var)) {
 				newvar.name = var;
@@ -829,7 +829,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 		else error(declarator->left->line, "It's not a variable!");
 
 
-		Tree* initializer = declarator->right->right;
+		TreePtr initializer = declarator->right->right;
 		if (initializer == NULL) {
 			error(declarator->line, "Lack the initializer for variable.");
 		}
@@ -847,20 +847,20 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 	else error(declarator->right->line, "Wrong value to variable");
 }
 
-varNode Parser::parser_assignment_expression(struct Tree* assign_exp) {	//返回变量节点
+varNode Parser::parser_assignment_expression(TreePtr assign_exp) {	//返回变量节点
 
 	//cout << "parser_assignment_expression" << endl;
 
 	if (assign_exp->left->name == "logical_or_expression") {
-		struct Tree* logical_or_exp = assign_exp->left;
+		TreePtr logical_or_exp = assign_exp->left;
 
 		return parser_logical_or_expression(logical_or_exp);
 	}
 	//赋值运算
 	else if(assign_exp->left->name == "unary_expression"){
-		struct Tree* unary_exp = assign_exp->left;
+		TreePtr unary_exp = assign_exp->left;
 		string op = assign_exp->left->right->left->name;
-		struct Tree* next_assign_exp = assign_exp->left->right->right;
+		TreePtr next_assign_exp = assign_exp->left->right->right;
 		varNode node1 = parser_unary_expression(unary_exp);
 		varNode node2 = parser_assignment_expression(next_assign_exp);
 		varNode node3;
@@ -940,10 +940,10 @@ varNode Parser::parser_assignment_expression(struct Tree* assign_exp) {	//返回变
 	}
 }
 
-varNode Parser::parser_logical_or_expression(struct Tree* logical_or_exp) {
+varNode Parser::parser_logical_or_expression(TreePtr logical_or_exp) {
 
 	if(logical_or_exp->left->name == "logical_and_expression"){
-		struct Tree* logical_and_exp = logical_or_exp->left;
+		TreePtr logical_and_exp = logical_or_exp->left;
 		return parser_logical_and_expression(logical_and_exp);
 	}
 	else if (logical_or_exp->left->name == "logical_or_expression") {
@@ -970,10 +970,10 @@ varNode Parser::parser_logical_or_expression(struct Tree* logical_or_exp) {
 
 }
 
-varNode Parser::parser_logical_and_expression(struct Tree* logical_and_exp) {
+varNode Parser::parser_logical_and_expression(TreePtr logical_and_exp) {
 	
 	if (logical_and_exp->left->name == "inclusive_or_expression") {
-		Tree* inclusive_or_exp = logical_and_exp->left;
+		TreePtr inclusive_or_exp = logical_and_exp->left;
 		return parser_inclusive_or_expression(inclusive_or_exp);
 	}
 	else if (logical_and_exp->left->name == "logical_and_expression") {
@@ -997,10 +997,10 @@ varNode Parser::parser_logical_and_expression(struct Tree* logical_and_exp) {
 	}
 }
 
-varNode Parser::parser_inclusive_or_expression(struct Tree* inclusive_or_exp) {
+varNode Parser::parser_inclusive_or_expression(TreePtr inclusive_or_exp) {
 	
 	if (inclusive_or_exp->left->name == "exclusive_or_expression") {
-		Tree* exclusive_or_exp = inclusive_or_exp->left;
+		TreePtr exclusive_or_exp = inclusive_or_exp->left;
 		return parser_exclusive_or_expression(exclusive_or_exp);
 	}
 	else if (inclusive_or_exp->left->name == "inclusive_or_expression") {
@@ -1020,10 +1020,10 @@ varNode Parser::parser_inclusive_or_expression(struct Tree* inclusive_or_exp) {
 	}
 }
 
-varNode Parser::parser_exclusive_or_expression(struct Tree *exclusive_or_exp) {
+varNode Parser::parser_exclusive_or_expression(TreePtr exclusive_or_exp) {
 	
 	if (exclusive_or_exp->left->name == "and_expression") {
-		Tree* and_exp = exclusive_or_exp->left;
+		TreePtr and_exp = exclusive_or_exp->left;
 		return parser_and_expression(and_exp);
 	}
 	else if (exclusive_or_exp->left->name == "exclusive_or_expression") {
@@ -1043,9 +1043,9 @@ varNode Parser::parser_exclusive_or_expression(struct Tree *exclusive_or_exp) {
 	}
 }
 
-varNode Parser::parser_and_expression(struct Tree* and_exp) {
+varNode Parser::parser_and_expression(TreePtr and_exp) {
 	if (and_exp->left->name == "equality_expression") {
-		Tree* equality_exp = and_exp->left;
+		TreePtr equality_exp = and_exp->left;
 		return parser_equality_expression(equality_exp);
 	}
 	else if (and_exp->left->name == "and_expression") {
@@ -1067,10 +1067,10 @@ varNode Parser::parser_and_expression(struct Tree* and_exp) {
 	}
 }
 
-varNode Parser::parser_equality_expression(struct Tree* equality_exp) {
+varNode Parser::parser_equality_expression(TreePtr equality_exp) {
 	
 	if (equality_exp->left->name == "relational_expression") {
-		Tree* relational_exp = equality_exp->left;
+		TreePtr relational_exp = equality_exp->left;
 		return parser_relational_expression(relational_exp);
 	}
 	else if (equality_exp->left->right->name == "EQ_OP" || equality_exp->left->right->name == "NE_OP") {
@@ -1099,9 +1099,9 @@ varNode Parser::parser_equality_expression(struct Tree* equality_exp) {
 	}
 }
 
-varNode Parser::parser_relational_expression(struct Tree* relational_exp) {
+varNode Parser::parser_relational_expression(TreePtr relational_exp) {
 	if (relational_exp->left->name == "shift_expression") {
-		Tree* shift_exp = relational_exp->left;
+		TreePtr shift_exp = relational_exp->left;
 		return parser_shift_expression(shift_exp);
 	}
 	else {
@@ -1132,9 +1132,9 @@ varNode Parser::parser_relational_expression(struct Tree* relational_exp) {
 	}
 }
 
-varNode Parser::parser_shift_expression(struct Tree*shift_exp) {
+varNode Parser::parser_shift_expression(TreePtr shift_exp) {
 	if (shift_exp->left->name == "additive_expression") {
-		Tree* additive_exp = shift_exp->left;
+		TreePtr additive_exp = shift_exp->left;
 		return parser_additive_expression(additive_exp);
 	}
 	else if (shift_exp->left->right->name == "LEFT_OP" || shift_exp->left->right->name == "RIGHT_OP") {
@@ -1162,9 +1162,9 @@ varNode Parser::parser_shift_expression(struct Tree*shift_exp) {
 	}
 }
 
-varNode Parser::parser_additive_expression(struct Tree* additive_exp) {
+varNode Parser::parser_additive_expression(TreePtr additive_exp) {
 	if (additive_exp->left->name == "multiplicative_expression") {
-		Tree* mult_exp = additive_exp->left;
+		TreePtr mult_exp = additive_exp->left;
 		return parser_multiplicative_expression(mult_exp);
 	}
 	else if (additive_exp->left->right->name == "+" || additive_exp->left->right->name == "-") {
@@ -1184,10 +1184,10 @@ varNode Parser::parser_additive_expression(struct Tree* additive_exp) {
 	}
 }
 
-varNode Parser::parser_multiplicative_expression(struct Tree* mult_exp) {
+varNode Parser::parser_multiplicative_expression(TreePtr mult_exp) {
 
 	if (mult_exp->left->name == "unary_expression") {
-		Tree* unary_exp = mult_exp->left;
+		TreePtr unary_exp = mult_exp->left;
 		return parser_unary_expression(unary_exp);
 	}
 	else if (mult_exp->left->right->name == "*" || mult_exp->left->right->name == "/" || 
@@ -1209,9 +1209,9 @@ varNode Parser::parser_multiplicative_expression(struct Tree* mult_exp) {
 	}
 }
 
-varNode Parser::parser_unary_expression(struct Tree*unary_exp) {
+varNode Parser::parser_unary_expression(TreePtr unary_exp) {
 	if (unary_exp->left->name == "postfix_expression") {
-		Tree* post_exp = unary_exp->left;
+		TreePtr post_exp = unary_exp->left;
 		return parser_postfix_expression(post_exp);
 	}
 	else if (unary_exp->left->name == "INC_OP") {
@@ -1300,16 +1300,16 @@ varNode Parser::parser_unary_expression(struct Tree*unary_exp) {
 	}
 }
 
-varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
+varNode Parser::parser_postfix_expression(TreePtr post_exp) {
 	//cout << "here" << endl;
 	if (post_exp->left->name == "primary_expression") {
-		Tree* primary_exp = post_exp->left;
+		TreePtr primary_exp = post_exp->left;
 		return parser_primary_expression(primary_exp);
 	}
 	else if (post_exp->left->right->name == "[") {
 		//数组调用
 		string arrayName = post_exp->left->left->left->content;
-		Tree* expression = post_exp->left->right->right;
+		TreePtr expression = post_exp->left->right->right;
 		varNode enode = parser_expression(expression);
 		arrayNode anode = getArrayNode(arrayName);
 
@@ -1372,7 +1372,7 @@ varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
 		}
 
 		if (post_exp->left->right->right->name == "argument_expression_list") {
-			Tree* argument_exp_list = post_exp->left->right->right;
+			TreePtr argument_exp_list = post_exp->left->right->right;
 			parser_argument_expression_list(argument_exp_list, funcName);
 			//cout << "funcCall" << endl;
 
@@ -1454,8 +1454,8 @@ varNode Parser::parser_postfix_expression(struct Tree* post_exp) {
 	}
 }
 
-void Parser::parser_argument_expression_list(struct Tree* node, string funcName) {
-	Tree* argu_exp_list = node->left;
+void Parser::parser_argument_expression_list(TreePtr node, string funcName) {
+	TreePtr argu_exp_list = node->left;
 	funcNode func = funcPool[funcName];
 	int i = 0;
 	while (argu_exp_list->name == "argument_expression_list") {
@@ -1480,7 +1480,7 @@ void Parser::parser_argument_expression_list(struct Tree* node, string funcName)
 	}
 }
 
-varNode Parser::parser_primary_expression(struct Tree* primary_exp) {
+varNode Parser::parser_primary_expression(TreePtr primary_exp) {
 	if (primary_exp->left->name == "IDENTIFIER") {
 		string content = primary_exp->left->content;
 		varNode rnode = lookupNode(content);
@@ -1524,7 +1524,7 @@ varNode Parser::parser_primary_expression(struct Tree* primary_exp) {
 		return newNode;
 	}
 	else if (primary_exp->left->name == "(") {
-		struct Tree* expression = primary_exp->left->right;
+		TreePtr expression = primary_exp->left->right;
 		return parser_expression(expression);
 	}
 }

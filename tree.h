@@ -16,14 +16,15 @@ struct Tree {
     string content;
     string name;
     int line;       //所在代码行数
-    struct Tree *left;
-    struct Tree *right;
+    struct Tree* left;
+    struct Tree* right;
 };
+typedef struct Tree* TreePtr;
 
-extern struct Tree *root;
+extern TreePtr root;
 
 struct Tree* createTree(string name, int num,...);
-//void print(struct Tree *head,int leavel);
-void freeTree(Tree* node);
+//void print(TreePtr head,int leavel);
+void freeTree(TreePtr node);
 
 #endif
