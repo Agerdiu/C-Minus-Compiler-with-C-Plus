@@ -19,60 +19,65 @@ private:
 	map<string, funcNode> funcPool;			//函数池
 	vector<Record> recordStack;				//维护的栈
 	InnerCode innerCode;					//中间代码生成工具
+	//set<string> build_in_function;
 
 	TreePtr root;
 
 	void Init();
 	void parseTree(TreePtr node);
 
-	TreePtr parserDeclaration(TreePtr node);		//分析parserDeclaration的节点
-	void parserInitDeclaratorList(string, TreePtr);
-	void parserInitDeclarator(string, TreePtr );			//分析parserInitDeclarator的节点
+	
+	TreePtr parser_declaration(TreePtr node);		//分析parser_declaration的节点
+	void parser_init_declarator_list(string, TreePtr);
+	void parser_init_declarator(string, TreePtr );			//分析parser_init_declarator的节点
 
-	TreePtr parserFunctionDefinition(TreePtr);
-	void parserParameterList(TreePtr,string,bool);			//获取函数形参列表
-	void parserParameterDeclaration(TreePtr, string,bool);	//获取函数单个形参
+	TreePtr parser_function_definition(TreePtr);
+	void parser_parameter_list(TreePtr,string,bool);			//获取函数形参列表
+	void parser_parameter_declaration(TreePtr, string,bool);	//获取函数单个形参
 
-	TreePtr parserStatement(TreePtr);
+	TreePtr parser_statement(TreePtr);
 
-	void parserExpressionStatement(TreePtr);
-	void parserArgumentExpressionList(TreePtr,string);
-	void parserJumpStatement(TreePtr);
-	void parserCompoundStatement(TreePtr);
-	void parserSelectionStatement(TreePtr);
-	void parserIterationStatement(TreePtr);
+	void parser_expression_statement(TreePtr);
+	varNode parser_expression(TreePtr);
 
-	varNode parserExpression(TreePtr);
-	varNode parserAssignmentExpression(TreePtr);			//赋值表达式
-	varNode parserLogicalOrExpression(TreePtr);			//逻辑或表达式
-	varNode parserLogicalAndExpression(TreePtr);		//逻辑或表达式
-	varNode parserInclusiveOrExpression(TreePtr);
-	varNode parserExclusiveOrExpression(TreePtr);
-	varNode parserAndExpression(TreePtr);
-	varNode parserEqualityExpression(TreePtr);
-	varNode parserRelationalExpression(TreePtr);
-	varNode parserShiftExpression(TreePtr);
-	varNode parserAdditiveExpression(TreePtr);
-	varNode parserMultiplicativeExpression(TreePtr);
-	varNode parserUnaryExpression(TreePtr);
-	varNode parserPostfixExpression(TreePtr);
-	varNode parserPrimaryExpression(TreePtr);
+	void parser_argument_expression_list(TreePtr,string);
+
+	void parser_jump_statement(TreePtr);
+	void parser_compound_statement(TreePtr);
+	void parser_selection_statement(TreePtr);
+	void parser_iteration_statement(TreePtr);
+
+	varNode parser_assignment_expression(TreePtr);			//赋值表达式
+	varNode parser_logical_or_expression(TreePtr);			//逻辑或表达式
+	varNode parser_logical_and_expression(TreePtr);		//逻辑或表达式
+	varNode parser_inclusive_or_expression(TreePtr);
+	varNode parser_exclusive_or_expression(TreePtr);
+	varNode parser_and_expression(TreePtr);
+	varNode parser_equality_expression(TreePtr);
+	varNode parser_relational_expression(TreePtr);
+	varNode parser_shift_expression(TreePtr);
+	varNode parser_additive_expression(TreePtr);
+	varNode parser_multiplicative_expression(TreePtr);
+	varNode parser_unary_expression(TreePtr);
+	varNode parser_postfix_expression(TreePtr);
+	varNode parser_primary_expression(TreePtr);
 
 
-	string findVar(string name);			//返回变量类型，找不到返回""
-	bool findCurruntVar(string name);		//查找当前块的var
-	struct varNode findNode(string name);	//返回变量节点
-	string getReturnType();
-	string getArrayType(string name);
-	struct arrayNode getArrayNode(string name);
+	string lookupVar(string name);			//返回变量类型，找不到返回""
+	bool lookupCurruntVar(string name);		//查找当前块的var
+	struct varNode lookupNode(string name);	//返回变量节点
+	string getFuncRType();
+	string getArrayType(string);
+	struct arrayNode getArrayNode(string);
 
 	int getBreakRecordNumber();
 
-	struct varNode createVar(string name, string type);
+	struct varNode TempCreater(string name, string type);
 
-	void printError(int line, string error);
+	void error(int line, string error);
 
 	void print_map();
+	void print_code();
 };
 
 
