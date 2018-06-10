@@ -12,6 +12,8 @@ int fact(int n){
 int main()
 {
     int result,times;
+	int ta[20];
+	ta[0] = 255;
     times=read();
     for(int i=0;i<times;i++){
     	int m = read();

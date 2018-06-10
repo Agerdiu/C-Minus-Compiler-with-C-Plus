@@ -807,7 +807,7 @@ void Parser::parser_init_declarator(string vartype, struct Tree* node) {
 				anode.num = innerCode.arrayNum++;
 				innerCode.addCode("DEC " + innerCode.getarrayNodeName(anode) + " " + tnode.name);
 
-				recordStack.back().arrayMap.insert({ arrayName,anode });
+				recordStack.back().arrayInsert(anode);
 			}
 		}
 	}
@@ -1546,7 +1546,6 @@ bool Parser::lookupCurruntVar(string name) {
 }
 
 struct varNode Parser::lookupNode(string name) {
-	cout << "变量获取!" << endl;
 	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
 		if (recordStack[i].varFind(name) == true)
@@ -1567,19 +1566,21 @@ string Parser::getFuncRType() {
 }
 
 string Parser::getArrayType(string name) {
+	cout << "GetArrayType!" << endl;
 	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
-		if (recordStack[i].arrayMap.find(name) != recordStack[i].arrayMap.end())
-			return recordStack[i].arrayMap[name].type;
+		if (recordStack[i].arrayFind(name) == true)
+			return recordStack[i].arrayGet(name).type;
 	}
 	return "";
 }
 
 struct arrayNode Parser::getArrayNode(string name) {
+	cout << "GetArrayNode!" << endl;
 	int N = recordStack.size();
 	for (int i = N - 1; i >= 0; i--) {
-		if (recordStack[i].arrayMap.find(name) != recordStack[i].arrayMap.end())
-			return recordStack[i].arrayMap[name];
+		if (recordStack[i].arrayFind(name) == true)
+			return recordStack[i].arrayGet(name);
 	}
 	arrayNode temp;
 	temp.num = -1;

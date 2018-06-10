@@ -7,6 +7,5 @@ unsigned int MyHash(string str)
 	{
 		hash ^= ((hash << 5) + str[i] + (hash >> 2));
 	}
-	cout << hash << endl;
 	return hash;
 }

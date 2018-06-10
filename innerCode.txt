@@ -1,2 +1,58 @@
 FUNCTION fact :
 PARAM var0
+temp0 := #1
+IF var0 == temp0 JUMP label0
+JUMP label1
+LABEL label0 :
+RETURN var0
+JUMP label2
+LABEL label1 :
+temp2 := #1
+temp3 := var0 - temp2
+ARG temp3
+temp4 := CALL fact
+temp5 := var0 * temp4
+var1 := temp5
+RETURN var1
+LABEL label2 :
+FUNCTION main :
+temp6 := #20
+temp8 := #4
+temp7 := temp8 * temp6
+DEC array0 temp7
+temp9 := #0
+temp12 := #4
+temp11 := temp9 * temp12
+temp10 := &array0 + temp11
+temp13 := #255
+*temp10 := temp13
+temp14 := CALL read
+var3 := temp14
+temp15 := #0
+var4 := temp15
+LABEL label3 :
+IF var4 < var3 JUMP label4
+JUMP label5
+LABEL label4 :
+temp17 := CALL read
+var5 := temp17
+temp18 := #1
+IF var5 > temp18 JUMP label6
+JUMP label7
+LABEL label6 :
+ARG var5
+temp20 := CALL fact
+var2 := temp20
+JUMP label8
+LABEL label7 :
+temp21 := #1
+var2 := temp21
+LABEL label8 :
+ARG var2
+CALL print
+temp23 := #1
+var4 := var4 + temp23
+JUMP label3
+LABEL label5 :
+temp24 := #0
+RETURN temp24
