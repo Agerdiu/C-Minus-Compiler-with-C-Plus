@@ -81,13 +81,7 @@ TreePtr Parser::parser_statement(TreePtr node) {
 }
 
 void Parser::parser_jump_statement(TreePtr node) {
-	if (node->left->name == "JUMP") {
-
-	}
-	else if (node->left->name == "CONTINUE") {
-
-	}
-	else if (node->left->name == "BREAK") {
+	if (node->left->name == "BREAK") {
 		int num = getBreakRecordNumber();
 		if (num < 0) {
 			error(node->left->line, "This scope doesn't support break.");
@@ -568,10 +562,6 @@ TreePtr Parser::parser_function_definition(TreePtr node) {
 	string funcType = type_specifier->left->content;
 	string funcName = declarator->left->left->content;
 
-	/*if (build_in_function.find(funcName) != build_in_function.end()) {
-		error(declarator->left->left->line, "Function name can't be bulid in function.");
-	}*/
-
 	bool isdeclared = false;
 	funcNode declarFunc;
 	if (funcPool.find(funcName) != funcPool.end()) {
@@ -588,15 +578,15 @@ TreePtr Parser::parser_function_definition(TreePtr node) {
 		}
 	}
 
-	//进入新的block
-	Record funBlock;
-	funBlock.isfunc = true;
-	funBlock.func.name = funcName;
-	funBlock.func.rtype = funcType;
-	funBlock.func.isdefinied = true;
+	//进入新的record
+	Record funRecord;
+	funRecord.isfunc = true;
+	funRecord.func.name = funcName;
+	funRecord.func.rtype = funcType;
+	funRecord.func.isdefinied = true;
 	//将函数记录在块内并添加到函数池
-	recordStack.push_back(funBlock);
-	funcPool.insert({funcName,funBlock.func});
+	recordStack.push_back(funRecord);
+	funcPool.insert({funcName,funRecord.func});
 
 	innerCode.addCode("FUNCTION " + funcName + " :");
 
@@ -611,17 +601,17 @@ TreePtr Parser::parser_function_definition(TreePtr node) {
 		if (func.rtype != declarFunc.rtype) {
 			error(type_specifier->left->line, "Function return type doesn't equal to the function declared before.");
 		}
-		cout << funBlock.func.paralist.size() << endl;
+		cout << funRecord.func.paralist.size() << endl;
 		if (func.paralist.size() != declarFunc.paralist.size()) {
 			error(declarator->left->right->right->line, "The number of function parameters doesn't equal to the function declared before.");
 		}
-		for (int i = 0; i < funBlock.func.paralist.size(); i++) {
+		for (int i = 0; i < funRecord.func.paralist.size(); i++) {
 			if (func.paralist[i].type != declarFunc.paralist[i].type)
-				error(declarator->left->right->right->line, "The parameter " + funBlock.func.paralist[i].name + "'s type doesn't equal to the function declared before." );
+				error(declarator->left->right->right->line, "The parameter " + funRecord.func.paralist[i].name + "'s type doesn't equal to the function declared before." );
 		}
 	}
 	//更新Block中func的参数列表
-	funBlock.func = func;
+	funRecord.func = func;
 	//分析函数的正文
 	parser_compound_statement(compound_statement);
 
